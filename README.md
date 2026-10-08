@@ -36,6 +36,10 @@ python scripts/make_cover.py --date 2026-09-30 --out cover.png
 
 # 3) 用自己的品牌底图（模板模式）
 python scripts/make_cover.py --date 2026-09-30 --template brand.jpg --out cover.png
+
+# 4)（可选）把日报转成发布服务的章节结构，并校验标题/摘要字数
+python scripts/build_article.py --md "库目录/AI日报/YYYY-MM-DD.md" \
+  --focus "焦点短语" --abstract "摘要" --cover "<封面直链>" --out article.json
 ```
 
 `digest.json` 就是一个结构化的中间产物（`sources.hex2077` / `sources.aihot` / `sources.followBuilders`），
@@ -84,6 +88,10 @@ Builder 观点       （按 builder 分块）
 
 技能文档里包含与第三方排版/发布服务对接的可选流程（建稿 → 推送到**草稿箱**）。
 它不是必需部分，且需要自备服务与公众号绑定（公众号 API 一般仅认证号可用）。
+
+其中 `build_article.py` 负责把日报 Markdown 转成发布服务的章节 JSON，并硬性校验
+标题 ≤30 字 / 摘要 ≤100 字（超限报错退出、不静默截断），同时产出待建稿状态文件防重复建稿。
+
 **红线**：只推草稿箱，**群发永远由人工在公众号后台点击**。
 
 ## 自动化
