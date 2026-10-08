@@ -228,7 +228,14 @@ def run_follow_builders(max_chars: int, timeout: int) -> dict:
         )
         if not p.stdout.strip():
             return {"error": f"empty stdout (exit {p.returncode})", "stderr": (p.stderr or "")[-400:]}
-        return json.loads(p.stdout)
+        data = json.loads(p.stdout)
+        # lite 内部取数失败时会返回 status=partial + errors[]（无 error 键）。
+        # 若不冒泡，外层会误判为"上游无更新"，实际是网络取不到 —— 这里统一转成 error。
+        if not data.get("error") and data.get("status") not in (None, "ok"):
+            inner = data.get("errors") or []
+            if inner:
+                data["error"] = "; ".join(str(e) for e in inner)[:400]
+        return data
     except Exception as e:  # noqa: BLE001
         return {"error": f"{type(e).__name__}: {e}"}
 
