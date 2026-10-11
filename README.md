@@ -94,6 +94,31 @@ Builder 观点       （按 builder 分块）
 
 **红线**：只推草稿箱，**群发永远由人工在公众号后台点击**。
 
+### 无头环境下的直连通道（方案 A）
+
+远程 OAuth MCP 服务有个典型坑：access token 只有 1 小时，而宿主平台的**无头自动化会话
+不会触发凭据刷新**（只在有人工交互的会话启动时才刷），于是定时任务时段里工具"不存在"
+（是检索不到，不是报错）。同一现象还会出现在**连接在宿主网络未就绪时失败后不再重连**的场景。
+
+解法是绕开宿主连接器，用一条属于本机的独立授权通道直连：
+
+```bash
+# 1) 授权一次（动态客户端注册 + PKCE；--manual 只打印链接，回头把回调 URL 交回脚本）
+python scripts/yanxu_auth.py --manual
+python scripts/yanxu_auth.py --exchange "http://127.0.0.1:8765/callback?code=..."
+
+# 2) 之后每天一条命令跑完「上传封面 → 建稿 → 推草稿箱」（refresh_token 自动续期）
+export YANXU_ACCOUNT_ID="<你的公众号ID>"
+python scripts/yanxu_publish.py --md "AI日报/YYYY-MM-DD.md" --cover cover.png \
+  --focus "焦点短语" --abstract "摘要" --theme-id neon \
+  --out article.json --pending 待建稿.json
+```
+
+- 三个脚本：`yanxu_auth.py`（授权）/ `yanxu_mcp.py`（直连 + `--status/--tools/--accounts/--themes`）/ `yanxu_publish.py`（一步到草稿箱）。
+- **幂等**：`--pending` 里的状态文件为 `done` 时自动跳过——发布服务通常没有草稿删除接口，避免同一天重复建稿。
+- **安全**：token 存本地 `~/.yanxu/`（可用 `YANXU_HOME` 改），已在 `.gitignore` 排除；仓库不含任何账号 ID 与凭据，账号通过参数或环境变量传入。
+- 服务地址默认指向示例服务，可用 `YANXU_ISSUER` 换成任意实现了同名 MCP 工具的服务。
+
 ## 自动化
 
 配合 cron / Windows 任务计划 / AI Agent 平台定时执行，建议时间在三个源当日更新之后。
