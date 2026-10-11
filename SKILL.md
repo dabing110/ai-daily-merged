@@ -208,7 +208,9 @@ python scripts/build_article.py \
 - **自动校验 `title ≤ 30`、`abstract ≤ 100`**，超限直接报错退出（退出码 2）且**不写文件**，不会静默截断——此时缩短 `--focus` / `--abstract` 重跑即可。
 - `--focus` 缺省取第一条主条目标题的前 18 字；`--abstract` 缺省取前 3 条要点拼接。
 - `--pending` 写出待建稿状态文件（`status=pending`），建稿成功后应改写为 `done` 并记入返回的 id，**用于防同日重复建稿**（多数发布服务没有删除草稿的接口，重跑会让草稿箱多一份）。
-- 解析依赖固定版式：`## 今日要点` / `## 主条目`（`### N.`）/ `## 今日速览` / `## Builder 观点` / `## 播客` / `## 来源与免责声明`。改版式要同步改脚本。
+- 解析依赖固定版式：`## 今日要点` / 主条目 / `## 今日速览` / `## Builder 观点` / `## 播客` / `## 来源与免责声明`。改版式要同步改脚本。
+- **主条目的标题层级是关键（踩过坑）**：必须写成 `## 一、xxx` / `## 二、xxx`（中文序号二级标题），**不要**写成「`## 主条目` + `### 1. xxx`」三层结构——脚本只认前者的二级标题，三层结构会把第 2 条起的内容降级成段落文字塞进第一章（统计只显示「主条目 1」）。旧三层版式仍兼容（已做 A/B 双解析），但新写的日报请用二级标题。
+- **建稿前必看统计行**：脚本会打印 `chapters: N 块 | 要点 a / 主条目 b / 速览 c / Builder d / 播客 e / 免责 f`，其中 `b` 必须与 MD 里主条目条数一致（Builder 同理），不一致先改 MD 再重跑。
 
 ## 推送到微信公众号（可选，需自备发布服务）
 
@@ -242,6 +244,28 @@ python scripts/build_article.py \
 **未绑定公众号的处置**：查询返回空 → 不要反复重试、也不要猜账号。
 如实告知用户需要先绑定公众号，并说明公众号 API 的资质门槛（一般仅认证号可用）。
 此时交付 HTML 供人工粘贴发布。
+
+### 无头环境下绕开宿主连接器：独立 OAuth 直连（方案 A）
+
+上面的 5 步依赖宿主把 MCP 工具注册进会话。无头自动化会话里这一步经常不成立（见「发布服务的
+MCP 工具搜不到」一节），此时改用仓库内的三个脚本直连，**与宿主连接器完全解耦**：
+
+```bash
+# 一次性授权（动态客户端注册 + PKCE）
+python scripts/yanxu_auth.py --manual      # 打印授权链接
+python scripts/yanxu_auth.py --exchange "<回调URL或裸code>"
+
+# 每天一条命令：刷新 token → 上传封面取直链 → build_article.py → create_article → publish_article
+export YANXU_ACCOUNT_ID="<公众号ID>"        # 仓库不预置任何账号
+python scripts/yanxu_publish.py --md "<日报MD>" --cover "<封面PNG>" \
+  --focus "<≤18字>" --abstract "<≤100字>" --theme-id neon \
+  --out "article_YYYY-MM-DD.json" --pending "待建稿_YYYY-MM-DD.json"
+```
+
+- 退出码 0 = 已进草稿箱；stdout 打印 `info_id` / `publish_id` / `media_id`，汇报时带上。
+- `--dry-run` 只上传封面 + 生成 chapters，不建稿不发布（首次自检用）。
+- **幂等**：`--pending` 文件 `status=done` 时自动跳过；同日重跑会让草稿箱多一份（多数服务无删除接口），非必要不重跑。
+- token 存 `~/.yanxu/`（`YANXU_HOME` 可改），授权客户端有效期一般为 30 天，到期重新授权一次；日常 refresh_token 自动续期。
 
 ## 每日人工审核流程（推荐）
 
