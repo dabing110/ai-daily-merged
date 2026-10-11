@@ -8,6 +8,14 @@ AI日报_*.html
 # ---- 封面底图模板（个人品牌素材，自行保留）----
 封面模板.jpg
 
+# ---- 授权凭据（含 access/refresh token，绝不能入库）----
+.yanxu_*.json
+.yanxu_token.json
+.yanxu_client.json
+.yanxu_pkce.json
+article_*.json
+待建稿_*.json
+
 # ---- Python ----
 __pycache__/
 *.py[cod]
