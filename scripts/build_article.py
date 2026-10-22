@@ -55,8 +55,16 @@ def split_frontmatter(raw: str):
 
 
 def section_blocks(body: str, heading: str):
-    """取出 '## heading' 到下一个 '## ' 之间的内容行。"""
+    """取出 '## heading' 到下一个 '## ' 之间的内容行。
+    heading 为模糊匹配：允许中间夹杂字符，例如「来源与免责声明」也能命中
+    「来源说明与免责声明」（历史上因多写"说明"两字导致整段被静默丢弃）。
+    """
+    # 1) 精确优先
     m = re.search(r"^##\s+" + re.escape(heading) + r".*$", body, re.M)
+    if not m:
+        # 2) 退化为顺序模糊匹配（容错标题里多字，如「来源说明与免责声明」）
+        pat = r"^##\s+" + r"[^\n]{0,4}?".join(map(re.escape, heading)) + r".*$"
+        m = re.search(pat, body, re.M)
     if not m:
         return []
     rest = body[m.end():]
