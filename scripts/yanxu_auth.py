@@ -63,8 +63,18 @@ def http_post_json(url, payload):
     req = urllib.request.Request(
         url, data=data, headers={"Content-Type": "application/json"}, method="POST"
     )
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            body = e.read().decode("utf-8", "replace")
+        except Exception:
+            body = ""
+        try:
+            raise RuntimeError(f"HTTP {e.code}: {json.loads(body)}") from e
+        except Exception:
+            raise RuntimeError(f"HTTP {e.code}: {body[:400]}") from e
 
 
 def http_post_form(url, payload):
