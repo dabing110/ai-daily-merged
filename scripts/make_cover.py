@@ -107,9 +107,9 @@ class Canvas:
             row[i:i + 3] = bytes(color)
         else:
             r, g, b = color
-            row[i] = int(row[i] + (r - row[i]) * alpha + 0.5)
-            row[i + 1] = int(row[i + 1] + (g - row[i + 1]) * alpha + 0.5)
-            row[i + 2] = int(row[i + 2] + (b - row[i + 2]) * alpha + 0.5)
+            row[i] = round(row[i] + (r - row[i]) * alpha)
+            row[i + 1] = round(row[i + 1] + (g - row[i + 1]) * alpha)
+            row[i + 2] = round(row[i + 2] + (b - row[i + 2]) * alpha)
 
     def vgrad(self, x0, y0, x1, y1, top, bottom):
         """竖直渐变填充矩形"""
