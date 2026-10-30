@@ -343,7 +343,10 @@ def build_with_template(template_path, date_str, out_path, accent_hex):
 # ---------- 主流程 ----------
 
 def hex2rgb(s: str) -> tuple[int, int, int]:
+    """解析 #RRGGBB 为 (R, G, B)。8 位 #RRGGBBAA 会忽略 alpha。"""
     s = s.lstrip("#")
+    if len(s) not in (6, 8):
+        raise ValueError(f"hex2rgb: 期望 6 位或 8 位十六进制，实际 '{s}'")
     return tuple(int(s[i:i + 2], 16) for i in (0, 2, 4))
 
 
