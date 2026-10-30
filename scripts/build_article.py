@@ -85,7 +85,7 @@ def section_blocks(body: str, heading: str):
 def parse_key_points(body: str):
     """今日要点 -> ordered list items。"""
     items = []
-    for ln in section_blocks(body, "今日要点"):
+    for ln in section_blocks(body, SEC_KEY_POINTS):
         m = re.match(r"^\s*\d+\.\s+(.*)$", ln)
         if m:
             items.append(strip_links(m.group(1)))
@@ -100,38 +100,38 @@ def parse_main_entries(body: str):
       B（现行）：## 一、标题 / ## 二、标题（编号中文序号）
     扫描到下一个非数字二级标题时收尾。
     """
-    entries, cur, in_sec = [], None, False
+    entries, current_entry, in_sec = [], None, False
     for ln in body.splitlines():
         m = re.match(r"^##\s+(.*)$", ln)
         if m:
             heading = m.group(1).strip()
             num = re.match(r"^[一二三四五六七八九十]+\s*、\s*(.*)$", heading)
             if num:  # 版式 B：新的一条主条目
-                if cur:
-                    entries.append(cur)
-                cur = {"title": num.group(1).strip(), "paras": []}
+                if current_entry:
+                    entries.append(current_entry)
+                current_entry = {"title": num.group(1).strip(), "paras": []}
                 in_sec = True
                 continue
-            if cur:
-                entries.append(cur)
-                cur = None
-            in_sec = heading.startswith("主条目")
+            if current_entry:
+                entries.append(current_entry)
+                current_entry = None
+            in_sec = heading.startswith(SEC_MAIN_ENTRIES)
             continue
         if not in_sec:
             continue
-        if cur is None:
+        if current_entry is None:
             m3 = re.match(r"^###\s+(.*)$", ln)  # 版式 A 的子标题
             if m3:
-                cur = {"title": strip_links(m3.group(1)).strip(), "paras": []}
+                current_entry = {"title": strip_links(m3.group(1)).strip(), "paras": []}
             continue
         if not ln.strip() or ln.strip() == "---":
             continue
         # 去掉 **事件内容** / **值得关注的原因** 这类加粗小标题，正文照常并入
         ln = re.sub(r"^\*\*([^*：:]+)\*\*[：:]?\s*", "", ln.strip()).strip()
         if ln:
-            cur["paras"].append(strip_links(ln))
-    if cur:
-        entries.append(cur)
+            current_entry["paras"].append(strip_links(ln))
+    if current_entry:
+        entries.append(current_entry)
 
     chapters = []
     for e in entries:
@@ -172,7 +172,7 @@ def parse_prose(body: str, heading: str):
 # Builder 观点按人分块：以 "**Name**（bio）" 起头，其下的 - 条目并入同一段，
 # 输出形如「Name（bio）：观点...」，去掉 markdown 星号
 def parse_builders(body: str):
-    lines = [ln for ln in section_blocks(body, "Builder 观点") if ln.strip() != "---"]
+    lines = [ln for ln in section_blocks(body, SEC_BUILDERS) if ln.strip() != "---"]
     blocks, name, buf = [], None, []
 
     def flush():
