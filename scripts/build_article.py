@@ -24,6 +24,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime
 
 TITLE_MAX = 30
 ABSTRACT_MAX = 100
@@ -232,7 +233,12 @@ def main():
         else:
             print("ERROR: 无法解析日期——frontmatter 无 date，文件名也不含 YYYY-MM-DD")
             return 2
-    m, d = int(date.split("-")[1]), int(date.split("-")[2])
+    try:
+        _dt = datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        print(f"ERROR: 日期格式无效: {date}（应为 YYYY-MM-DD）")
+        return 2
+    m, d = _dt.month, _dt.day
 
     key_points = parse_key_points(body)
     main_ch = parse_main_entries(body)
