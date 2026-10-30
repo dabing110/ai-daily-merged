@@ -22,6 +22,9 @@ token 存本地文件，之后由 yanxu_mcp.py 自行刷新并直连，全程不
     .yanxu_pkce.json     # 待完成的 PKCE（verifier/state）
     .yanxu_token.json    # access/refresh token（敏感，勿外传，已在 .gitignore 中排除）
 """
+
+from __future__ import annotations
+
 import argparse
 import base64
 import hashlib

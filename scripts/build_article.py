@@ -19,6 +19,8 @@ build_article.py —— 把 Obsidian 日报 MD 转成言序 create_article 参�
 退出码：0=成功；2=字数超限或解析失败（此时不写文件）
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os

@@ -10,6 +10,8 @@
   python make_cover.py --date 2026-09-29 --title "AI日报" --accent "#165DFF" --out cover.png
 """
 
+from __future__ import annotations
+
 import argparse
 import math
 import os

@@ -19,6 +19,9 @@ token 直接以 JSON-RPC 调远程工具，因此无头环境也能稳定跑通�
     python yanxu_mcp.py --accounts               # 快捷：列出已绑定公众号
     python yanxu_mcp.py --themes                 # 快捷：列出样式主题
 """
+
+from __future__ import annotations
+
 import argparse
 import json
 import os
