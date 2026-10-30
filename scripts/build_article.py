@@ -47,7 +47,7 @@ def strip_links(text: str) -> str:
     return text.replace("**", "").strip()
 
 
-def split_frontmatter(raw: str):
+def split_frontmatter(raw: str) -> tuple[dict, str]:
     """返回 (meta_dict, body)。无 frontmatter 时 meta 为空字典。"""
     if raw.startswith("---"):
         end = raw.find("\n---", 3)
@@ -63,7 +63,7 @@ def split_frontmatter(raw: str):
     return {}, raw
 
 
-def section_blocks(body: str, heading: str):
+def section_blocks(body: str, heading: str) -> list[str]:
     """取出 '## heading' 到下一个 '## ' 之间的内容行。
     heading 为模糊匹配：允许中间夹杂字符，例如「来源与免责声明」也能命中
     「来源说明与免责声明」（历史上因多写"说明"两字导致整段被静默丢弃）。
@@ -82,7 +82,7 @@ def section_blocks(body: str, heading: str):
     return [ln.rstrip() for ln in chunk.strip().splitlines()]
 
 
-def parse_key_points(body: str):
+def parse_key_points(body: str) -> list[str]:
     """今日要点 -> ordered list items。"""
     items = []
     for ln in section_blocks(body, SEC_KEY_POINTS):
@@ -92,7 +92,7 @@ def parse_key_points(body: str):
     return items
 
 
-def parse_main_entries(body: str):
+def parse_main_entries(body: str) -> list[dict]:
     """主条目 -> [{title, blocks:[paragraph...]}]
 
     兼容两种版式：
@@ -141,7 +141,7 @@ def parse_main_entries(body: str):
     return chapters
 
 
-def parse_bullets(body: str, heading: str):
+def parse_bullets(body: str, heading: str) -> list[str]:
     """今日速览 -> unordered list items。"""
     items = []
     for ln in section_blocks(body, heading):
@@ -151,7 +151,7 @@ def parse_bullets(body: str, heading: str):
     return items
 
 
-def parse_prose(body: str, heading: str):
+def parse_prose(body: str, heading: str) -> list[str]:
     """Builder 观点 / 播客 / 免责声明：每遇到 **加粗** 起的段落就切一块。"""
     lines = [ln for ln in section_blocks(body, heading) if ln.strip() != "---"]
     paras, buf = [], []
@@ -171,7 +171,7 @@ def parse_prose(body: str, heading: str):
 
 # Builder 观点按人分块：以 "**Name**（bio）" 起头，其下的 - 条目并入同一段，
 # 输出形如「Name（bio）：观点...」，去掉 markdown 星号
-def parse_builders(body: str):
+def parse_builders(body: str) -> list[str]:
     lines = [ln for ln in section_blocks(body, SEC_BUILDERS) if ln.strip() != "---"]
     blocks, name, buf = [], None, []
 
@@ -196,7 +196,7 @@ def parse_builders(body: str):
     return [b for b in blocks if b]
 
 
-def quote_intro(body: str):
+def quote_intro(body: str) -> str:
     """取 '> ...' 引用块作为缺省 intro。"""
     out = []
     for ln in body.splitlines():
@@ -207,7 +207,7 @@ def quote_intro(body: str):
     return " ".join(out)
 
 
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--md", required=True, help="日报 Markdown 绝对路径")
     ap.add_argument("--focus", default="", help="标题焦点短语（<=18 字）")
