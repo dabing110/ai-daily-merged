@@ -22,6 +22,7 @@ token 存本地文件，之后由 yanxu_mcp.py 自行刷新并直连，全程不
     .yanxu_pkce.json     # 待完成的 PKCE（verifier/state）
     .yanxu_token.json    # access/refresh token（敏感，勿外传，已在 .gitignore 中排除）
 """
+import argparse
 import base64
 import hashlib
 import http.server
@@ -344,17 +345,19 @@ def cmd_wait():
 
 
 def main():
-    argv = sys.argv[1:]
-    if "--status" in argv:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    group = ap.add_mutually_exclusive_group()
+    group.add_argument("--status", action="store_true", help="查看 client / token 状态")
+    group.add_argument("--manual", action="store_true", help="只打印授权链接并保存 PKCE，不等待")
+    group.add_argument("--exchange", metavar="CODE_OR_URL", help="用 --manual 保存的 PKCE 换取 token")
+    args = ap.parse_args()
+
+    if args.status:
         return cmd_status()
-    if "--manual" in argv:
+    if args.manual:
         return cmd_manual()
-    if "--exchange" in argv:
-        i = argv.index("--exchange")
-        if i + 1 >= len(argv):
-            print("用法：--exchange \"<回调URL或裸code>\"")
-            return 1
-        return cmd_exchange(argv[i + 1])
+    if args.exchange is not None:
+        return cmd_exchange(args.exchange)
     return cmd_wait()
 
 
