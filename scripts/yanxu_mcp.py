@@ -57,8 +57,8 @@ def save_json(path, obj) -> None:
         json.dump(obj, f, ensure_ascii=False, indent=2)
     try:
         os.chmod(path, 0o600)
-    except Exception:
-        pass
+    except (AttributeError, OSError):
+        pass  # Windows 上 os.chmod 不存在或不可用，忽略
 
 
 # ---------- token 管理 ----------
