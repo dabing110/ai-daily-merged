@@ -56,7 +56,6 @@ def _find_lite_script() -> Path:
     return cands[0]
 
 
-LITE_SCRIPT = _find_lite_script()
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ai-daily-merged/1.0"
 
 
@@ -224,11 +223,12 @@ def fetch_aihot(target: datetime, window_hours: int, timeout: int) -> dict:
 
 # ---------------------------------------------------------------- source 3: follow-builders-lite
 def run_follow_builders(max_chars: int, timeout: int) -> dict:
-    if not LITE_SCRIPT.exists():
-        return {"error": f"lite script not found: {LITE_SCRIPT}"}
+    lite_script = _find_lite_script()
+    if not lite_script.exists():
+        return {"error": f"lite script not found: {lite_script}"}
     try:
         p = subprocess.run(
-            [sys.executable, str(LITE_SCRIPT), "--language", "zh", "--max-field-chars", str(max_chars)],
+            [sys.executable, str(lite_script), "--language", "zh", "--max-field-chars", str(max_chars)],
             capture_output=True,
             text=True,
             timeout=timeout,
