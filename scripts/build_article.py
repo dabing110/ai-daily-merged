@@ -41,6 +41,13 @@ SEC_DISCLAIMER = "来源与免责声明"
 LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
 
 
+def _ensure_dir(path: str) -> None:
+    """若 path 的父目录不存在则创建（幂等）。"""
+    d = os.path.dirname(path)
+    if d:
+        os.makedirs(d, exist_ok=True)
+
+
 def strip_links(text: str) -> str:
     """把 [text](url) 转成 'text url'，并去掉 ** 加粗（公众号块不渲染 markdown）。"""
     text = LINK_RE.sub(r"\1 \2", text)
@@ -297,6 +304,7 @@ def main() -> int:
                "cover_img": args.cover, "chapters": chapters}
 
     out = args.out or os.path.join(os.path.dirname(args.md), "article_%s.json" % date)
+    _ensure_dir(out)
     with open(out, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
@@ -304,6 +312,7 @@ def main() -> int:
         state = {"date": date, "md": args.md, "cover": args.cover,
                  "article_json": out, "title": title, "abstract": abstract,
                  "status": "pending"}
+        _ensure_dir(args.pending)
         with open(args.pending, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
         print("PENDING", args.pending)
