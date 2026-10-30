@@ -113,11 +113,12 @@ def get_access_token(force=False):
 # ---------- MCP JSON-RPC ----------
 
 class McpClient:
-    def __init__(self, token=None):
+    def __init__(self, token=None, timeout: int = 60):
         self.token = token or get_access_token()
         self.session_id = None
         self._id = 0
         self.server_info = None
+        self.timeout = timeout
 
     def _post(self, payload, notify=False):
         data = json.dumps(payload).encode("utf-8")
@@ -131,7 +132,7 @@ class McpClient:
             headers["Mcp-Session-Id"] = self.session_id
         req = urllib.request.Request(MCP_URL, data=data, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urllib.request.urlopen(req, timeout=self.timeout) as r:
                 sid = r.headers.get("Mcp-Session-Id") or r.headers.get("mcp-session-id")
                 if sid:
                     self.session_id = sid
@@ -234,6 +235,7 @@ def main() -> int:
     group.add_argument("--themes", action="store_true", help="快捷：列出样式主题")
     group.add_argument("--call", metavar="TOOL", help="调用指定工具，配合 --args")
     ap.add_argument("--args", default="{}", help="传给 --call 的 JSON 参数（默认 {}）")
+    ap.add_argument("--timeout", type=int, default=60, help="单次 MCP 请求超时秒数（默认 60）")
     args = ap.parse_args()
 
     try:
@@ -254,7 +256,7 @@ def main() -> int:
             refresh_access_token()
             return 0
 
-        cli = McpClient()
+        cli = McpClient(timeout=args.timeout)
         init = cli.initialize()
         print(f"[mcp] 已连接，server={cli.server_info}，session={cli.session_id}")
 
