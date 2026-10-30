@@ -97,14 +97,14 @@ def http_post_form(url, payload):
             return e.code, {"raw": body}
 
 
-def load_json(path):
+def load_json(path) -> dict | None:
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             return json.load(f)
     return None
 
 
-def save_json(path, obj):
+def save_json(path, obj) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
@@ -139,7 +139,7 @@ def get_or_register_client():
     return info
 
 
-def pkce_pair():
+def pkce_pair() -> tuple[str, str]:
     verifier = secrets.token_urlsafe(64)[:64]
     challenge = base64.urlsafe_b64encode(
         hashlib.sha256(verifier.encode("ascii")).digest()
@@ -344,7 +344,7 @@ def cmd_wait():
     return 0
 
 
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     group = ap.add_mutually_exclusive_group()
     group.add_argument("--status", action="store_true", help="查看 client / token 状态")
