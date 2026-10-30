@@ -78,7 +78,7 @@ def http_post_json(url, payload):
             raise RuntimeError(f"HTTP {e.code}: {body[:400]}") from e
 
 
-def http_post_form(url, payload):
+def http_post_form(url, payload) -> dict:
     data = urllib.parse.urlencode(payload).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -88,13 +88,16 @@ def http_post_form(url, payload):
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            return r.status, json.loads(r.read().decode("utf-8"))
+            return json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace")
         try:
-            return e.code, json.loads(body)
+            body = e.read().decode("utf-8", "replace")
         except Exception:
-            return e.code, {"raw": body}
+            body = ""
+        try:
+            raise RuntimeError(f"HTTP {e.code}: {json.loads(body)}") from e
+        except Exception:
+            raise RuntimeError(f"HTTP {e.code}: {body[:400]}") from e
 
 
 def load_json(path) -> dict | None:
@@ -280,18 +283,22 @@ def cmd_exchange(raw):
     if not code:
         print("❌ 未能从输入中解析出 code。")
         return 1
-    status, tok = http_post_form(
-        TOKEN_URL,
-        {
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": REDIRECT_URI,
-            "client_id": pkce["client_id"],
-            "code_verifier": pkce["verifier"],
-        },
-    )
-    if status != 200 or "access_token" not in tok:
-        print(f"❌ 换取 token 失败 HTTP {status}: {tok}")
+    try:
+        tok = http_post_form(
+            TOKEN_URL,
+            {
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": REDIRECT_URI,
+                "client_id": pkce["client_id"],
+                "code_verifier": pkce["verifier"],
+            },
+        )
+    except RuntimeError as e:
+        print(f"❌ 换取 token 失败: {e}")
+        return 1
+    if "access_token" not in tok:
+        print(f"❌ 换取 token 失败（响应无 access_token）: {tok}")
         return 1
     save_token(pkce["client_id"], tok)
     try:
@@ -325,18 +332,22 @@ def cmd_wait():
         print(f"❌ 回调未带 code：{result}")
         return 1
     print(f"[auth] 收到授权码（{code[:8]}…）")
-    status, tok = http_post_form(
-        TOKEN_URL,
-        {
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": REDIRECT_URI,
-            "client_id": client["client_id"],
-            "code_verifier": verifier,
-        },
-    )
-    if status != 200 or "access_token" not in tok:
-        print(f"❌ 换取 token 失败 HTTP {status}: {tok}")
+    try:
+        tok = http_post_form(
+            TOKEN_URL,
+            {
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": REDIRECT_URI,
+                "client_id": client["client_id"],
+                "code_verifier": verifier,
+            },
+        )
+    except RuntimeError as e:
+        print(f"❌ 换取 token 失败: {e}")
+        return 1
+    if "access_token" not in tok:
+        print(f"❌ 换取 token 失败（响应无 access_token）: {tok}")
         return 1
     save_token(client["client_id"], tok)
     expires_in = int(tok.get("expires_in") or 3600)
