@@ -44,14 +44,14 @@ TOOLS_DIR = os.environ.get("YANXU_HOME") or os.path.join(os.path.expanduser("~")
 TOKEN_FILE = os.path.join(TOOLS_DIR, ".yanxu_token.json")
 
 
-def load_json(path):
+def load_json(path) -> dict | None:
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             return json.load(f)
     return None
 
 
-def save_json(path, obj):
+def save_json(path, obj) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
@@ -63,7 +63,7 @@ def save_json(path, obj):
 
 # ---------- token 管理 ----------
 
-def refresh_access_token(tok=None):
+def refresh_access_token(tok: dict | None = None) -> dict:
     tok = tok or load_json(TOKEN_FILE)
     if not tok or not tok.get("refresh_token"):
         raise RuntimeError("没有 refresh_token，请先运行 yanxu_auth.py --manual 完成授权")
@@ -204,7 +204,7 @@ class McpClient:
         )
 
 
-def unwrap(resp):
+def unwrap(resp) -> dict | str | list | None:
     """把 tools/call 返回里的 content 文本抽出来"""
     if not resp:
         return resp
