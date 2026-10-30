@@ -30,6 +30,17 @@ from pathlib import Path
 CST = timezone(timedelta(hours=8))
 HEX_BASE = "https://hex2077.dev/zh-CN/docs"
 AIHOT_FEED = "https://aihot.news/feed.xml"
+
+# strip_tags 用的预编译正则（避免每次调用都重编译）
+_RE_SVG = re.compile(r"<svg[\s\S]*?</svg>", re.I)
+_RE_SCRIPT = re.compile(r"<script[\s\S]*?</script>", re.I)
+_RE_STYLE = re.compile(r"<style[\s\S]*?</style>", re.I)
+_RE_IMG = re.compile(r"<img[^>]*>", re.I)
+_RE_BR = re.compile(r"<br\s*/?>", re.I)
+_RE_P_END = re.compile(r"</p>", re.I)
+_RE_ANY_TAG = re.compile(r"<[^>]+>")
+_RE_WS = re.compile(r"[ \t\u00a0]+")
+_RE_MULTI_NL = re.compile(r"\n\s*\n+")
 def _find_lite_script() -> Path:
     """定位 follow-builders-lite 的取数脚本。
 
@@ -61,16 +72,16 @@ def http_get(url: str, timeout: int = 25) -> str:
 def strip_tags(s: str) -> str:
     if not s:
         return ""
-    s = re.sub(r"<svg[\s\S]*?</svg>", " ", s, flags=re.I)
-    s = re.sub(r"<script[\s\S]*?</script>", " ", s, flags=re.I)
-    s = re.sub(r"<style[\s\S]*?</style>", " ", s, flags=re.I)
-    s = re.sub(r"<img[^>]*>", " ", s, flags=re.I)
-    s = re.sub(r"<br\s*/?>", "\n", s, flags=re.I)
-    s = re.sub(r"</p>", "\n", s, flags=re.I)
-    s = re.sub(r"<[^>]+>", "", s)
+    s = _RE_SVG.sub(" ", s)
+    s = _RE_SCRIPT.sub(" ", s)
+    s = _RE_STYLE.sub(" ", s)
+    s = _RE_IMG.sub(" ", s)
+    s = _RE_BR.sub("\n", s)
+    s = _RE_P_END.sub("\n", s)
+    s = _RE_ANY_TAG.sub("", s)
     s = htmlmod.unescape(s)
-    s = re.sub(r"[ \t\u00a0]+", " ", s)
-    s = re.sub(r"\n\s*\n+", "\n", s)
+    s = _RE_WS.sub(" ", s)
+    s = _RE_MULTI_NL.sub("\n", s)
     return s.strip()
 
 
