@@ -116,7 +116,12 @@ def build_chapters(md_path, focus, abstract, cover_url, intro, out_json, pending
     p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     print(p.stdout.strip())
     if p.returncode != 0:
-        raise RuntimeError(f"build_article.py 失败（退出码 {p.returncode}）: {p.stderr.strip()}")
+        msg = f"build_article.py 失败（退出码 {p.returncode}）"
+        if p.stderr.strip():
+            msg += f"\n  stderr: {p.stderr.strip()}"
+        if p.stdout.strip():
+            msg += f"\n  stdout: {p.stdout.strip()[-400:]}"
+        raise RuntimeError(msg)
     return load_json(out_json)
 
 
