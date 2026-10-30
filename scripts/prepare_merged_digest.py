@@ -258,6 +258,7 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--timeout", type=int, default=25)
     ap.add_argument("--max-chars", type=int, default=6000, help="follow-builders 长文本截断")
     ap.add_argument("--no-follow-builders", action="store_true", help="跳过 follow-builders 源")
+    ap.add_argument("--fb-timeout", type=int, default=150, help="follow-builders 子进程超时秒数（默认150）")
     ap.add_argument("--out", help="把 JSON 写入该文件（否则只写 stdout）")
     return ap.parse_args()
 
@@ -289,7 +290,7 @@ def main() -> int:
 
     fb_data: dict = {}
     if not args.no_follow_builders:
-        fb_data = run_follow_builders(args.max_chars, timeout=150)
+        fb_data = run_follow_builders(args.max_chars, timeout=args.fb_timeout)
         if fb_data.get("error"):
             errors.append(f"follow-builders: {fb_data['error']}")
 
