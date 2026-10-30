@@ -162,6 +162,17 @@ def main():
         print(f"  title    = {article['title']}")
         print(f"  abstract = {article['abstract']}")
         print(f"  chapters = {len(article['chapters'])} 块")
+        if args.pending:
+            rec = load_json(args.pending) or {}
+            rec.update(
+                {
+                    "status": "ready",
+                    "cover": cover_url,
+                    "account_id": args.account_id,
+                }
+            )
+            save_json(args.pending, rec)
+            print(f"[dry-run] 已更新 {args.pending}（status=ready）")
         return 0
 
     if not args.account_id:
