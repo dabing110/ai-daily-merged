@@ -356,23 +356,29 @@ def build(date_str, title, subtitle, accent_hex, out_path, w=900, h=383):
     c.vgrad(0, 0, w, h, deep, mid)
 
     # 装饰：无版权几何光斑（纯算法）
-    c.disc(w * 0.86, h * 0.16, 74, accent, alpha=0.20)
-    c.disc(w * 0.72, h * 0.92, 52, (90, 150, 255), alpha=0.13)
-    c.disc(w * 0.05, h * 0.88, 44, accent, alpha=0.09)
+    _DECOR_SPOTS = [
+        (0.86, 0.16, 74, accent, 0.20),
+        (0.72, 0.92, 52, (90, 150, 255), 0.13),
+        (0.05, 0.88, 44, accent, 0.09),
+    ]
+    for sx, sy, sr, sc, sa in _DECOR_SPOTS:
+        c.disc(w * sx, h * sy, sr, sc, alpha=sa)
 
     # 顶部强调条
     c.rect(0, 0, w, 5, accent, alpha=0.95)
 
     # 代码流装饰线（右侧，程序化）
-    for i in range(9):
+    _CODE_LINES = 9
+    for i in range(_CODE_LINES):
         y = 52 + i * 33
         ln = int(52 + (i * 37) % 118)
         alpha = 0.10 + (i % 3) * 0.05
         c.rect(w - 210, y, w - 210 + ln, y + 3, (120, 175, 255), alpha=alpha)
 
     # 网格点阵（左下）
-    for gy in range(5):
-        for gx in range(7):
+    _GRID_ROWS, _GRID_COLS = 5, 7
+    for gy in range(_GRID_ROWS):
+        for gx in range(_GRID_COLS):
             c.rect(34 + gx * 15, h - 96 + gy * 15, 37 + gx * 15, h - 93 + gy * 15,
                    (110, 160, 240), alpha=0.16)
 
