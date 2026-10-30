@@ -66,7 +66,7 @@ def _find_build_article():
 BUILD_ARTICLE = _find_build_article()
 
 
-def upload_cover(cli, png_path):
+def upload_cover(cli, png_path, timeout: int = 90):
     """用 get_upload_channel 拿一次性通道，multipart 上传封面，返回公网直链"""
     ch = unwrap(cli.call_tool("get_upload_channel", {"scene": "cover"}))
     if isinstance(ch, list):
@@ -91,7 +91,7 @@ def upload_cover(cli, png_path):
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=90) as r:
+    with urllib.request.urlopen(req, timeout=timeout) as r:
         res = json.loads(r.read().decode("utf-8"))
     url = (res.get("data") or {}).get("url")
     if not url:
@@ -131,6 +131,7 @@ def main():
     ap.add_argument("--pending", default=None)
     ap.add_argument("--account-id", default=os.environ.get("YANXU_ACCOUNT_ID", "").strip())
     ap.add_argument("--theme-id", default=os.environ.get("YANXU_THEME_ID", "").strip())
+    ap.add_argument("--cover-timeout", type=int, default=90, help="封面上传超时秒数（默认 90）")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -148,7 +149,7 @@ def main():
     cli = McpClient()
     cli.initialize()
 
-    cover_url = upload_cover(cli, args.cover)
+    cover_url = upload_cover(cli, args.cover, timeout=args.cover_timeout)
     out_json = args.out or os.path.join(
         os.path.dirname(os.path.abspath(args.md)),
         f"article_{dt.date.today().isoformat()}.json",
