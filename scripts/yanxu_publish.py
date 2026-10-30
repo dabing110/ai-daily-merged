@@ -45,7 +45,7 @@ PYTHON = sys.executable
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def _find_build_article():
+def _find_build_article() -> str:
     cands = []
     env = os.environ.get("AI_DAILY_BUILD_ARTICLE", "").strip()
     if env:
@@ -66,7 +66,7 @@ def _find_build_article():
 BUILD_ARTICLE = _find_build_article()
 
 
-def upload_cover(cli, png_path, timeout: int = 90):
+def upload_cover(cli, png_path, timeout: int = 90) -> str:
     """用 get_upload_channel 拿一次性通道，multipart 上传封面，返回公网直链"""
     ch = unwrap(cli.call_tool("get_upload_channel", {"scene": "cover"}))
     if isinstance(ch, list):
@@ -100,7 +100,7 @@ def upload_cover(cli, png_path, timeout: int = 90):
     return url
 
 
-def build_chapters(md_path, focus, abstract, cover_url, intro, out_json, pending_json):
+def build_chapters(md_path, focus, abstract, cover_url, intro, out_json, pending_json) -> dict:
     cmd = [
         PYTHON, BUILD_ARTICLE,
         "--md", md_path,
@@ -125,7 +125,7 @@ def build_chapters(md_path, focus, abstract, cover_url, intro, out_json, pending
     return load_json(out_json)
 
 
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--md")
     ap.add_argument("--cover")
