@@ -27,7 +27,7 @@ from datetime import datetime
 # 可用环境变量 AI_DAILY_PYTHON 指定（优先级最高）；否则按平台探测常见安装路径。
 
 
-def _candidate_pythons():
+def _candidate_pythons() -> list[str]:
     cands = []
     env = os.environ.get("AI_DAILY_PYTHON", "").strip()
     if env:
@@ -45,7 +45,7 @@ def _candidate_pythons():
 _BOOTSTRAP_FLAG = "--_no-bootstrap"
 
 
-def _has_pil():
+def _has_pil() -> bool:
     try:
         import PIL  # noqa: F401
         return True
@@ -53,7 +53,7 @@ def _has_pil():
         return False
 
 
-def _bootstrap():
+def _bootstrap() -> int | None:
     """当前解释器没有 PIL 时，用备选解释器重跑自己（返回 exit code 或 None）。"""
     if _has_pil() or _BOOTSTRAP_FLAG in sys.argv:
         return None
@@ -78,7 +78,7 @@ def _chunk(tag: bytes, data: bytes) -> bytes:
             + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF))
 
 
-def write_png(path, width, height, rgb_rows):
+def write_png(path: str, width: int, height: int, rgb_rows: list[bytes]) -> None:
     """rgb_rows: 每行一个 bytes，长度为 width*3"""
     raw = b"".join(b"\x00" + row for row in rgb_rows)   # 每行前置 filter byte 0
     png = b"\x89PNG\r\n\x1a\n"
@@ -342,12 +342,12 @@ def build_with_template(template_path, date_str, out_path, accent_hex):
 
 # ---------- 主流程 ----------
 
-def hex2rgb(s):
+def hex2rgb(s: str) -> tuple[int, int, int]:
     s = s.lstrip("#")
     return tuple(int(s[i:i + 2], 16) for i in (0, 2, 4))
 
 
-def build(date_str, title, subtitle, accent_hex, out_path, w=900, h=383):
+def build(date_str: str, title: str, subtitle: str, accent_hex: str, out_path: str, w: int = 900, h: int = 383) -> bool:
     accent = hex2rgb(accent_hex)
     deep = (10, 18, 38)
     mid = (18, 34, 74)
