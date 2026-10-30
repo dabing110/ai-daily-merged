@@ -216,7 +216,14 @@ def main():
         raw = f.read()
 
     meta, body = split_frontmatter(raw)
-    date = meta.get("date") or re.search(r"(\d{4}-\d{2}-\d{2})", os.path.basename(args.md)).group(1)
+    date = meta.get("date")
+    if not date:
+        m_date = re.search(r"(\d{4}-\d{2}-\d{2})", os.path.basename(args.md))
+        if m_date:
+            date = m_date.group(1)
+        else:
+            print("ERROR: 无法解析日期——frontmatter 无 date，文件名也不含 YYYY-MM-DD")
+            return 2
     m, d = int(date.split("-")[1]), int(date.split("-")[2])
 
     key_points = parse_key_points(body)
