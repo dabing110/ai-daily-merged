@@ -85,6 +85,8 @@ def write_png(path, width, height, rgb_rows):
     png += _chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
     png += _chunk(b"IDAT", zlib.compress(raw, 9))
     png += _chunk(b"IEND", b"")
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, exist_ok=True)
     with open(path, "wb") as f:
         f.write(png)
 
