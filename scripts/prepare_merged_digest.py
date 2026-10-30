@@ -260,6 +260,7 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--no-follow-builders", action="store_true", help="跳过 follow-builders 源")
     ap.add_argument("--fb-timeout", type=int, default=150, help="follow-builders 子进程超时秒数（默认150）")
     ap.add_argument("--out", help="把 JSON 写入该文件（否则只写 stdout）")
+    ap.add_argument("-v", "--verbose", action="store_true", help="把内部错误也打印到 stderr")
     return ap.parse_args()
 
 
@@ -297,6 +298,10 @@ def main() -> int:
     # sanitize internal fields
     for it in aihot_data.get("items", []):
         it.pop("_pub", None)
+
+    if args.verbose and errors:
+        for e in errors:
+            print(f"[warn] {e}", file=sys.stderr)
 
     result = {
         "status": "ok" if not errors else "partial",
