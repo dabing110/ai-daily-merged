@@ -28,6 +28,14 @@ import sys
 TITLE_MAX = 30
 ABSTRACT_MAX = 100
 
+# 固定版式章节标题（与 SKILL.md 一致）
+SEC_KEY_POINTS = "今日要点"
+SEC_MAIN_ENTRIES = "主条目"
+SEC_QUICK = "今日速览"
+SEC_BUILDERS = "Builder 观点"
+SEC_PODCAST = "播客"
+SEC_DISCLAIMER = "来源与免责声明"
+
 # markdown 链接 [text](url) -> "text url"（公众号块不渲染 markdown，保留明文链接）
 LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
 
@@ -228,10 +236,10 @@ def main():
 
     key_points = parse_key_points(body)
     main_ch = parse_main_entries(body)
-    quick = parse_bullets(body, "今日速览")
+    quick = parse_bullets(body, SEC_QUICK)
     builders = parse_builders(body)
-    podcast = parse_prose(body, "播客")
-    disclaimer = parse_prose(body, "来源与免责声明")
+    podcast = parse_prose(body, SEC_PODCAST)
+    disclaimer = parse_prose(body, SEC_DISCLAIMER)
 
     if not key_points or not main_ch:
         print("ERROR: 解析失败——未找到「今日要点」或「主条目」，请检查 MD 版式")
@@ -263,20 +271,20 @@ def main():
         print("  abstract =", abstract)
         return 2
 
-    chapters = [{"title": "今日要点", "type": "chapter",
+    chapters = [{"title": SEC_KEY_POINTS, "type": "chapter",
                  "blocks": [{"type": "list", "style": "ordered", "items": key_points}]}]
     chapters += main_ch
     if quick:
-        chapters.append({"title": "今日速览", "type": "chapter",
+        chapters.append({"title": SEC_QUICK, "type": "chapter",
                          "blocks": [{"type": "list", "style": "unordered", "items": quick}]})
     if builders:
-        chapters.append({"title": "Builder 观点", "type": "chapter",
+        chapters.append({"title": SEC_BUILDERS, "type": "chapter",
                          "blocks": [{"type": "paragraph", "content": p} for p in builders]})
     if podcast:
-        chapters.append({"title": "播客", "type": "chapter",
+        chapters.append({"title": SEC_PODCAST, "type": "chapter",
                          "blocks": [{"type": "paragraph", "content": p} for p in podcast]})
     if disclaimer:
-        chapters.append({"title": "来源与免责声明", "type": "chapter",
+        chapters.append({"title": SEC_DISCLAIMER, "type": "chapter",
                          "blocks": [{"type": "paragraph", "content": p} for p in disclaimer]})
 
     payload = {"title": title, "abstract": abstract, "intro": intro,
