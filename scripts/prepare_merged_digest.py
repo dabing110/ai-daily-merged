@@ -22,7 +22,9 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 CST = timezone(timedelta(hours=8))
@@ -149,8 +151,6 @@ def fetch_hex2077(target: datetime, lookback_days: int, timeout: int) -> dict:
 
 # ---------------------------------------------------------------- source 2: AIHOT
 def parse_aihot(xml_text: str, cutoff: datetime) -> dict:
-    import xml.etree.ElementTree as ET
-
     root = ET.fromstring(xml_text)
     items = []
     for it in root.iter("item"):
@@ -161,8 +161,6 @@ def parse_aihot(xml_text: str, cutoff: datetime) -> dict:
         desc_html = g("description")
         pub_raw = g("pubDate")
         try:
-            from email.utils import parsedate_to_datetime
-
             pub = parsedate_to_datetime(pub_raw)
             if pub.tzinfo is None:
                 pub = pub.replace(tzinfo=timezone.utc)
