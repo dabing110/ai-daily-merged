@@ -206,22 +206,8 @@ class BitmapFont:
         if not self._pil:
             return False
         Image, ImageDraw, ImageFont = self._pil
-        path = None
-        for b, n in FONT_CANDIDATES:
-            for cand in ((b, n) if bold else (n, b)):
-                if not os.path.isfile(cand):
-                    continue
-                try:
-                    font = ImageFont.truetype(cand, size)
-                except Exception:
-                    continue
-                # 只有能真正映射出中文字形才算可用
-                if _font_has_cjk(font, ImageFont):
-                    path, font_obj = cand, font
-                    break
-            if path:
-                break
-        if not path:
+        font_obj = _find_font(ImageFont, size, bold)
+        if not font_obj:
             return False
         tmp = Image.new("RGB", (canvas.w, canvas.h), (0, 0, 0))
         d = ImageDraw.Draw(tmp)
@@ -242,6 +228,21 @@ def _font_has_cjk(font, ImageFont):
         return mask.size[0] > 0 and mask.size[1] > 0
     except Exception:
         return False
+
+
+def _find_font(ImageFont, size, bold=True):
+    """遍历 FONT_CANDIDATES 并返回第一个能正确渲染中文的 ImageFont 对象，或 None。"""
+    for b, n in FONT_CANDIDATES:
+        for cand in ((b, n) if bold else (n, b)):
+            if not os.path.isfile(cand):
+                continue
+            try:
+                font = ImageFont.truetype(cand, size)
+            except Exception:
+                continue
+            if _font_has_cjk(font, ImageFont):
+                return font
+    return None
 
 
 # ---------- 内置 5x7 拉丁点阵（PIL 缺失时的兜底）----------
@@ -297,17 +298,7 @@ def _resize_cover(img, w, h):
 
 
 def _pick_font(ImageFont, size, bold=True):
-    for b, n in FONT_CANDIDATES:
-        for cand in ((b, n) if bold else (n, b)):
-            if not os.path.isfile(cand):
-                continue
-            try:
-                font = ImageFont.truetype(cand, size)
-            except Exception:
-                continue
-            if _font_has_cjk(font, ImageFont):
-                return font
-    return None
+    return _find_font(ImageFont, size, bold)
 
 
 def _chip(img, ImageDraw, font, text, x, y, fg, bg, pad_x=18, pad_y=9, radius=10):
