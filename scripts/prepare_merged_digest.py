@@ -144,18 +144,14 @@ def fetch_hex2077(target: datetime, lookback_days: int, timeout: int) -> dict:
             html = http_get(url, timeout)
         except urllib.error.HTTPError as e:
             last_err = f"{url} -> HTTP {e.code}"
-            if e.code == 404:
-                continue
-            continue
         except Exception as e:  # noqa: BLE001
-            last_err = f"{url} -> {e}"
-            continue
-        data = parse_hex2077(html)
-        if not data["sections"]:
+            last_err = f"{url} -> {type(e).__name__}: {e}"
+        else:
+            data = parse_hex2077(html)
+            if data["sections"]:
+                data.update({"date": d.isoformat(), "url": url, "isFallback": i > 0, "daysBack": i})
+                return data
             last_err = f"{url} -> 页面无板块内容"
-            continue
-        data.update({"date": d.isoformat(), "url": url, "isFallback": i > 0, "daysBack": i})
-        return data
     return {"error": last_err or "no page found", "sections": []}
 
 
