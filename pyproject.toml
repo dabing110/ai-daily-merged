@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "ai-daily-merged"
+version = "0.1.0"
+description = "AI 日报三源融合工具集"
+authors = ["ai-daily-merged"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
