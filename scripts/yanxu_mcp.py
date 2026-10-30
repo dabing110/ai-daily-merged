@@ -19,6 +19,7 @@ token 直接以 JSON-RPC 调远程工具，因此无头环境也能稳定跑通�
     python yanxu_mcp.py --accounts               # 快捷：列出已绑定公众号
     python yanxu_mcp.py --themes                 # 快捷：列出样式主题
 """
+import argparse
 import json
 import os
 import sys
@@ -223,10 +224,20 @@ def unwrap(resp):
     return result
 
 
-def main():
-    argv = sys.argv[1:]
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    group = ap.add_mutually_exclusive_group()
+    group.add_argument("--status", action="store_true", help="查看 token 状态")
+    group.add_argument("--refresh", action="store_true", help="强制刷新 access token")
+    group.add_argument("--tools", action="store_true", help="列出服务端工具")
+    group.add_argument("--accounts", action="store_true", help="快捷：列出已绑定公众号")
+    group.add_argument("--themes", action="store_true", help="快捷：列出样式主题")
+    group.add_argument("--call", metavar="TOOL", help="调用指定工具，配合 --args")
+    ap.add_argument("--args", default="{}", help="传给 --call 的 JSON 参数（默认 {}）")
+    args = ap.parse_args()
+
     try:
-        if "--status" in argv:
+        if args.status:
             tok = load_json(TOKEN_FILE)
             if not tok:
                 print("未授权：先运行 yanxu_auth.py --manual")
@@ -239,7 +250,7 @@ def main():
             print(f"refresh   : {'有' if tok.get('refresh_token') else '无'}")
             return 0
 
-        if "--refresh" in argv:
+        if args.refresh:
             refresh_access_token()
             return 0
 
@@ -247,37 +258,28 @@ def main():
         init = cli.initialize()
         print(f"[mcp] 已连接，server={cli.server_info}，session={cli.session_id}")
 
-        if "--tools" in argv:
+        if args.tools:
             res = cli.list_tools()
             tools = (res or {}).get("result", {}).get("tools", [])
             for t in tools:
                 print(f"  - {t.get('name')}: {(t.get('description') or '')[:80]}")
             return 0
 
-        if "--accounts" in argv:
+        if args.accounts:
             print(json.dumps(unwrap(cli.call_tool("list_wechat_accounts", {})), ensure_ascii=False, indent=2))
             return 0
 
-        if "--themes" in argv:
+        if args.themes:
             print(json.dumps(unwrap(cli.call_tool("list_theme_styles", {})), ensure_ascii=False, indent=2))
             return 0
 
-        if "--call" in argv:
-            i = argv.index("--call")
-            if i + 1 >= len(argv):
-                print("用法：--call <tool> [--args '{...}']")
-                return 1
-            tool = argv[i + 1]
-            args = {}
-            if "--args" in argv:
-                j = argv.index("--args")
-                if j + 1 < len(argv):
-                    args = json.loads(argv[j + 1])
-            resp = cli.call_tool(tool, args)
+        if args.call:
+            call_args = json.loads(args.args)
+            resp = cli.call_tool(args.call, call_args)
             print(json.dumps(unwrap(resp), ensure_ascii=False, indent=2))
             return 0
 
-        print("用法：--status | --refresh | --tools | --accounts | --themes | --call <tool> --args '{...}'")
+        ap.print_help()
         return 0
     except Exception as e:
         print(f"❌ {e}")
