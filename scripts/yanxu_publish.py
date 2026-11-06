@@ -45,7 +45,7 @@ PYTHON = sys.executable
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def _find_build_article() -> str:
+def _find_build_article():
     cands = []
     env = os.environ.get("AI_DAILY_BUILD_ARTICLE", "").strip()
     if env:
@@ -66,7 +66,7 @@ def _find_build_article() -> str:
 BUILD_ARTICLE = _find_build_article()
 
 
-def upload_cover(cli, png_path, timeout: int = 90) -> str:
+def upload_cover(cli, png_path):
     """用 get_upload_channel 拿一次性通道，multipart 上传封面，返回公网直链"""
     ch = unwrap(cli.call_tool("get_upload_channel", {"scene": "cover"}))
     if isinstance(ch, list):
@@ -91,7 +91,7 @@ def upload_cover(cli, png_path, timeout: int = 90) -> str:
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with urllib.request.urlopen(req, timeout=90) as r:
         res = json.loads(r.read().decode("utf-8"))
     url = (res.get("data") or {}).get("url")
     if not url:
@@ -100,7 +100,7 @@ def upload_cover(cli, png_path, timeout: int = 90) -> str:
     return url
 
 
-def build_chapters(md_path, focus, abstract, cover_url, intro, out_json, pending_json) -> dict:
+def build_chapters(md_path, focus, abstract, cover_url, intro, out_json, pending_json):
     cmd = [
         PYTHON, BUILD_ARTICLE,
         "--md", md_path,
@@ -116,16 +116,11 @@ def build_chapters(md_path, focus, abstract, cover_url, intro, out_json, pending
     p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     print(p.stdout.strip())
     if p.returncode != 0:
-        msg = f"build_article.py 失败（退出码 {p.returncode}）"
-        if p.stderr.strip():
-            msg += f"\n  stderr: {p.stderr.strip()}"
-        if p.stdout.strip():
-            msg += f"\n  stdout: {p.stdout.strip()[-400:]}"
-        raise RuntimeError(msg)
+        raise RuntimeError(f"build_article.py 失败（退出码 {p.returncode}）: {p.stderr.strip()}")
     return load_json(out_json)
 
 
-def main() -> int:
+def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--md")
     ap.add_argument("--cover")
@@ -136,7 +131,6 @@ def main() -> int:
     ap.add_argument("--pending", default=None)
     ap.add_argument("--account-id", default=os.environ.get("YANXU_ACCOUNT_ID", "").strip())
     ap.add_argument("--theme-id", default=os.environ.get("YANXU_THEME_ID", "").strip())
-    ap.add_argument("--cover-timeout", type=int, default=90, help="封面上传超时秒数（默认 90）")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -154,7 +148,7 @@ def main() -> int:
     cli = McpClient()
     cli.initialize()
 
-    cover_url = upload_cover(cli, args.cover, timeout=args.cover_timeout)
+    cover_url = upload_cover(cli, args.cover)
     out_json = args.out or os.path.join(
         os.path.dirname(os.path.abspath(args.md)),
         f"article_{dt.date.today().isoformat()}.json",
@@ -168,17 +162,6 @@ def main() -> int:
         print(f"  title    = {article['title']}")
         print(f"  abstract = {article['abstract']}")
         print(f"  chapters = {len(article['chapters'])} 块")
-        if args.pending:
-            rec = load_json(args.pending) or {}
-            rec.update(
-                {
-                    "status": "ready",
-                    "cover": cover_url,
-                    "account_id": args.account_id,
-                }
-            )
-            save_json(args.pending, rec)
-            print(f"[dry-run] 已更新 {args.pending}（status=ready）")
         return 0
 
     if not args.account_id:
