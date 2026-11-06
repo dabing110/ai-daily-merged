@@ -19,35 +19,17 @@ build_article.py —— 把 Obsidian 日报 MD 转成言序 create_article 参�
 退出码：0=成功；2=字数超限或解析失败（此时不写文件）
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import os
 import re
 import sys
-from datetime import datetime
 
 TITLE_MAX = 30
 ABSTRACT_MAX = 100
 
-# 固定版式章节标题（与 SKILL.md 一致）
-SEC_KEY_POINTS = "今日要点"
-SEC_MAIN_ENTRIES = "主条目"
-SEC_QUICK = "今日速览"
-SEC_BUILDERS = "Builder 观点"
-SEC_PODCAST = "播客"
-SEC_DISCLAIMER = "来源与免责声明"
-
 # markdown 链接 [text](url) -> "text url"（公众号块不渲染 markdown，保留明文链接）
 LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
-
-
-def _ensure_dir(path: str) -> None:
-    """若 path 的父目录不存在则创建（幂等）。"""
-    d = os.path.dirname(path)
-    if d:
-        os.makedirs(d, exist_ok=True)
 
 
 def strip_links(text: str) -> str:
@@ -56,7 +38,7 @@ def strip_links(text: str) -> str:
     return text.replace("**", "").strip()
 
 
-def split_frontmatter(raw: str) -> tuple[dict, str]:
+def split_frontmatter(raw: str):
     """返回 (meta_dict, body)。无 frontmatter 时 meta 为空字典。"""
     if raw.startswith("---"):
         end = raw.find("\n---", 3)
@@ -72,7 +54,7 @@ def split_frontmatter(raw: str) -> tuple[dict, str]:
     return {}, raw
 
 
-def section_blocks(body: str, heading: str) -> list[str]:
+def section_blocks(body: str, heading: str):
     """取出 '## heading' 到下一个 '## ' 之间的内容行。
     heading 为模糊匹配：允许中间夹杂字符，例如「来源与免责声明」也能命中
     「来源说明与免责声明」（历史上因多写"说明"两字导致整段被静默丢弃）。
@@ -91,17 +73,17 @@ def section_blocks(body: str, heading: str) -> list[str]:
     return [ln.rstrip() for ln in chunk.strip().splitlines()]
 
 
-def parse_key_points(body: str) -> list[str]:
+def parse_key_points(body: str):
     """今日要点 -> ordered list items。"""
     items = []
-    for ln in section_blocks(body, SEC_KEY_POINTS):
+    for ln in section_blocks(body, "今日要点"):
         m = re.match(r"^\s*\d+\.\s+(.*)$", ln)
         if m:
             items.append(strip_links(m.group(1)))
     return items
 
 
-def parse_main_entries(body: str) -> list[dict]:
+def parse_main_entries(body: str):
     """主条目 -> [{title, blocks:[paragraph...]}]
 
     兼容两种版式：
@@ -109,38 +91,38 @@ def parse_main_entries(body: str) -> list[dict]:
       B（现行）：## 一、标题 / ## 二、标题（编号中文序号）
     扫描到下一个非数字二级标题时收尾。
     """
-    entries, current_entry, in_sec = [], None, False
+    entries, cur, in_sec = [], None, False
     for ln in body.splitlines():
         m = re.match(r"^##\s+(.*)$", ln)
         if m:
             heading = m.group(1).strip()
             num = re.match(r"^[一二三四五六七八九十]+\s*、\s*(.*)$", heading)
             if num:  # 版式 B：新的一条主条目
-                if current_entry:
-                    entries.append(current_entry)
-                current_entry = {"title": num.group(1).strip(), "paras": []}
+                if cur:
+                    entries.append(cur)
+                cur = {"title": num.group(1).strip(), "paras": []}
                 in_sec = True
                 continue
-            if current_entry:
-                entries.append(current_entry)
-                current_entry = None
-            in_sec = heading.startswith(SEC_MAIN_ENTRIES)
+            if cur:
+                entries.append(cur)
+                cur = None
+            in_sec = heading.startswith("主条目")
             continue
         if not in_sec:
             continue
-        if current_entry is None:
+        if cur is None:
             m3 = re.match(r"^###\s+(.*)$", ln)  # 版式 A 的子标题
             if m3:
-                current_entry = {"title": strip_links(m3.group(1)).strip(), "paras": []}
+                cur = {"title": strip_links(m3.group(1)).strip(), "paras": []}
             continue
         if not ln.strip() or ln.strip() == "---":
             continue
         # 去掉 **事件内容** / **值得关注的原因** 这类加粗小标题，正文照常并入
         ln = re.sub(r"^\*\*([^*：:]+)\*\*[：:]?\s*", "", ln.strip()).strip()
         if ln:
-            current_entry["paras"].append(strip_links(ln))
-    if current_entry:
-        entries.append(current_entry)
+            cur["paras"].append(strip_links(ln))
+    if cur:
+        entries.append(cur)
 
     chapters = []
     for e in entries:
@@ -150,7 +132,7 @@ def parse_main_entries(body: str) -> list[dict]:
     return chapters
 
 
-def parse_bullets(body: str, heading: str) -> list[str]:
+def parse_bullets(body: str, heading: str):
     """今日速览 -> unordered list items。"""
     items = []
     for ln in section_blocks(body, heading):
@@ -160,7 +142,7 @@ def parse_bullets(body: str, heading: str) -> list[str]:
     return items
 
 
-def parse_prose(body: str, heading: str) -> list[str]:
+def parse_prose(body: str, heading: str):
     """Builder 观点 / 播客 / 免责声明：每遇到 **加粗** 起的段落就切一块。"""
     lines = [ln for ln in section_blocks(body, heading) if ln.strip() != "---"]
     paras, buf = [], []
@@ -180,8 +162,8 @@ def parse_prose(body: str, heading: str) -> list[str]:
 
 # Builder 观点按人分块：以 "**Name**（bio）" 起头，其下的 - 条目并入同一段，
 # 输出形如「Name（bio）：观点...」，去掉 markdown 星号
-def parse_builders(body: str) -> list[str]:
-    lines = [ln for ln in section_blocks(body, SEC_BUILDERS) if ln.strip() != "---"]
+def parse_builders(body: str):
+    lines = [ln for ln in section_blocks(body, "Builder 观点") if ln.strip() != "---"]
     blocks, name, buf = [], None, []
 
     def flush():
@@ -205,7 +187,7 @@ def parse_builders(body: str) -> list[str]:
     return [b for b in blocks if b]
 
 
-def quote_intro(body: str) -> str:
+def quote_intro(body: str):
     """取 '> ...' 引用块作为缺省 intro。"""
     out = []
     for ln in body.splitlines():
@@ -216,7 +198,7 @@ def quote_intro(body: str) -> str:
     return " ".join(out)
 
 
-def main() -> int:
+def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--md", required=True, help="日报 Markdown 绝对路径")
     ap.add_argument("--focus", default="", help="标题焦点短语（<=18 字）")
@@ -234,27 +216,17 @@ def main() -> int:
         raw = f.read()
 
     meta, body = split_frontmatter(raw)
-    date = meta.get("date")
-    if not date:
-        m_date = re.search(r"(\d{4}-\d{2}-\d{2})", os.path.basename(args.md))
-        if m_date:
-            date = m_date.group(1)
-        else:
-            print("ERROR: 无法解析日期——frontmatter 无 date，文件名也不含 YYYY-MM-DD")
-            return 2
-    try:
-        _dt = datetime.strptime(date, "%Y-%m-%d")
-    except ValueError:
-        print(f"ERROR: 日期格式无效: {date}（应为 YYYY-MM-DD）")
-        return 2
-    m, d = _dt.month, _dt.day
+    date = meta.get("date") or re.search(r"(\d{4}-\d{2}-\d{2})", os.path.basename(args.md)).group(1)
+    m, d = int(date.split("-")[1]), int(date.split("-")[2])
 
     key_points = parse_key_points(body)
     main_ch = parse_main_entries(body)
-    quick = parse_bullets(body, SEC_QUICK)
+    quick = parse_bullets(body, "今日速览")
     builders = parse_builders(body)
-    podcast = parse_prose(body, SEC_PODCAST)
-    disclaimer = parse_prose(body, SEC_DISCLAIMER)
+    podcast = parse_prose(body, "播客")
+    disclaimer = parse_prose(body, "来源与免责声明")
+    # 可选：公众号脱敏版会把原始链接统一收拢到文末「原文链接」章节
+    ref_links = parse_bullets(body, "原文链接")
 
     if not key_points or not main_ch:
         print("ERROR: 解析失败——未找到「今日要点」或「主条目」，请检查 MD 版式")
@@ -286,27 +258,29 @@ def main() -> int:
         print("  abstract =", abstract)
         return 2
 
-    chapters = [{"title": SEC_KEY_POINTS, "type": "chapter",
+    chapters = [{"title": "今日要点", "type": "chapter",
                  "blocks": [{"type": "list", "style": "ordered", "items": key_points}]}]
     chapters += main_ch
     if quick:
-        chapters.append({"title": SEC_QUICK, "type": "chapter",
+        chapters.append({"title": "今日速览", "type": "chapter",
                          "blocks": [{"type": "list", "style": "unordered", "items": quick}]})
     if builders:
-        chapters.append({"title": SEC_BUILDERS, "type": "chapter",
+        chapters.append({"title": "Builder 观点", "type": "chapter",
                          "blocks": [{"type": "paragraph", "content": p} for p in builders]})
     if podcast:
-        chapters.append({"title": SEC_PODCAST, "type": "chapter",
+        chapters.append({"title": "播客", "type": "chapter",
                          "blocks": [{"type": "paragraph", "content": p} for p in podcast]})
     if disclaimer:
-        chapters.append({"title": SEC_DISCLAIMER, "type": "chapter",
+        chapters.append({"title": "来源与免责声明", "type": "chapter",
                          "blocks": [{"type": "paragraph", "content": p} for p in disclaimer]})
+    if ref_links:
+        chapters.append({"title": "原文链接", "type": "chapter",
+                         "blocks": [{"type": "list", "style": "unordered", "items": ref_links}]})
 
     payload = {"title": title, "abstract": abstract, "intro": intro,
                "cover_img": args.cover, "chapters": chapters}
 
     out = args.out or os.path.join(os.path.dirname(args.md), "article_%s.json" % date)
-    _ensure_dir(out)
     with open(out, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
@@ -314,7 +288,6 @@ def main() -> int:
         state = {"date": date, "md": args.md, "cover": args.cover,
                  "article_json": out, "title": title, "abstract": abstract,
                  "status": "pending"}
-        _ensure_dir(args.pending)
         with open(args.pending, "w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
         print("PENDING", args.pending)
@@ -322,9 +295,9 @@ def main() -> int:
     print("OK", out)
     print("title    (%d) %s" % (len(title), title))
     print("abstract (%d) %s" % (len(abstract), abstract))
-    print("chapters: %d 块 | 要点 %d / 主条目 %d / 速览 %d / Builder %d / 播客 %d / 免责 %d"
+    print("chapters: %d 块 | 要点 %d / 主条目 %d / 速览 %d / Builder %d / 播客 %d / 免责 %d / 原文链接 %d"
           % (len(chapters), len(key_points), len(main_ch), len(quick),
-             len(builders), len(podcast), len(disclaimer)))
+             len(builders), len(podcast), len(disclaimer), len(ref_links)))
     return 0
 
 
