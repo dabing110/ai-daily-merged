@@ -10,8 +10,6 @@
   python make_cover.py --date 2026-09-29 --title "AI日报" --accent "#165DFF" --out cover.png
 """
 
-from __future__ import annotations
-
 import argparse
 import math
 import os
@@ -29,7 +27,7 @@ from datetime import datetime
 # 可用环境变量 AI_DAILY_PYTHON 指定（优先级最高）；否则按平台探测常见安装路径。
 
 
-def _candidate_pythons() -> list[str]:
+def _candidate_pythons():
     cands = []
     env = os.environ.get("AI_DAILY_PYTHON", "").strip()
     if env:
@@ -47,7 +45,7 @@ def _candidate_pythons() -> list[str]:
 _BOOTSTRAP_FLAG = "--_no-bootstrap"
 
 
-def _has_pil() -> bool:
+def _has_pil():
     try:
         import PIL  # noqa: F401
         return True
@@ -55,7 +53,7 @@ def _has_pil() -> bool:
         return False
 
 
-def _bootstrap() -> int | None:
+def _bootstrap():
     """当前解释器没有 PIL 时，用备选解释器重跑自己（返回 exit code 或 None）。"""
     if _has_pil() or _BOOTSTRAP_FLAG in sys.argv:
         return None
@@ -80,15 +78,13 @@ def _chunk(tag: bytes, data: bytes) -> bytes:
             + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF))
 
 
-def write_png(path: str, width: int, height: int, rgb_rows: list[bytes]) -> None:
+def write_png(path, width, height, rgb_rows):
     """rgb_rows: 每行一个 bytes，长度为 width*3"""
     raw = b"".join(b"\x00" + row for row in rgb_rows)   # 每行前置 filter byte 0
     png = b"\x89PNG\r\n\x1a\n"
     png += _chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
     png += _chunk(b"IDAT", zlib.compress(raw, 9))
     png += _chunk(b"IEND", b"")
-    parent = os.path.dirname(os.path.abspath(path))
-    os.makedirs(parent, exist_ok=True)
     with open(path, "wb") as f:
         f.write(png)
 
@@ -109,9 +105,9 @@ class Canvas:
             row[i:i + 3] = bytes(color)
         else:
             r, g, b = color
-            row[i] = round(row[i] + (r - row[i]) * alpha)
-            row[i + 1] = round(row[i + 1] + (g - row[i + 1]) * alpha)
-            row[i + 2] = round(row[i + 2] + (b - row[i + 2]) * alpha)
+            row[i] = int(row[i] + (r - row[i]) * alpha + 0.5)
+            row[i + 1] = int(row[i + 1] + (g - row[i + 1]) * alpha + 0.5)
+            row[i + 2] = int(row[i + 2] + (b - row[i + 2]) * alpha + 0.5)
 
     def vgrad(self, x0, y0, x1, y1, top, bottom):
         """竖直渐变填充矩形"""
@@ -208,8 +204,22 @@ class BitmapFont:
         if not self._pil:
             return False
         Image, ImageDraw, ImageFont = self._pil
-        font_obj = _find_font(ImageFont, size, bold)
-        if not font_obj:
+        path = None
+        for b, n in FONT_CANDIDATES:
+            for cand in ((b, n) if bold else (n, b)):
+                if not os.path.isfile(cand):
+                    continue
+                try:
+                    font = ImageFont.truetype(cand, size)
+                except Exception:
+                    continue
+                # 只有能真正映射出中文字形才算可用
+                if _font_has_cjk(font, ImageFont):
+                    path, font_obj = cand, font
+                    break
+            if path:
+                break
+        if not path:
             return False
         tmp = Image.new("RGB", (canvas.w, canvas.h), (0, 0, 0))
         d = ImageDraw.Draw(tmp)
@@ -230,21 +240,6 @@ def _font_has_cjk(font, ImageFont):
         return mask.size[0] > 0 and mask.size[1] > 0
     except Exception:
         return False
-
-
-def _find_font(ImageFont, size, bold=True):
-    """遍历 FONT_CANDIDATES 并返回第一个能正确渲染中文的 ImageFont 对象，或 None。"""
-    for b, n in FONT_CANDIDATES:
-        for cand in ((b, n) if bold else (n, b)):
-            if not os.path.isfile(cand):
-                continue
-            try:
-                font = ImageFont.truetype(cand, size)
-            except Exception:
-                continue
-            if _font_has_cjk(font, ImageFont):
-                return font
-    return None
 
 
 # ---------- 内置 5x7 拉丁点阵（PIL 缺失时的兜底）----------
@@ -300,7 +295,17 @@ def _resize_cover(img, w, h):
 
 
 def _pick_font(ImageFont, size, bold=True):
-    return _find_font(ImageFont, size, bold)
+    for b, n in FONT_CANDIDATES:
+        for cand in ((b, n) if bold else (n, b)):
+            if not os.path.isfile(cand):
+                continue
+            try:
+                font = ImageFont.truetype(cand, size)
+            except Exception:
+                continue
+            if _font_has_cjk(font, ImageFont):
+                return font
+    return None
 
 
 def _chip(img, ImageDraw, font, text, x, y, fg, bg, pad_x=18, pad_y=9, radius=10):
@@ -344,15 +349,12 @@ def build_with_template(template_path, date_str, out_path, accent_hex):
 
 # ---------- 主流程 ----------
 
-def hex2rgb(s: str) -> tuple[int, int, int]:
-    """解析 #RRGGBB 为 (R, G, B)。8 位 #RRGGBBAA 会忽略 alpha。"""
+def hex2rgb(s):
     s = s.lstrip("#")
-    if len(s) not in (6, 8):
-        raise ValueError(f"hex2rgb: 期望 6 位或 8 位十六进制，实际 '{s}'")
     return tuple(int(s[i:i + 2], 16) for i in (0, 2, 4))
 
 
-def build(date_str: str, title: str, subtitle: str, accent_hex: str, out_path: str, w: int = 900, h: int = 383) -> bool:
+def build(date_str, title, subtitle, accent_hex, out_path, w=900, h=383):
     accent = hex2rgb(accent_hex)
     deep = (10, 18, 38)
     mid = (18, 34, 74)
@@ -361,29 +363,23 @@ def build(date_str: str, title: str, subtitle: str, accent_hex: str, out_path: s
     c.vgrad(0, 0, w, h, deep, mid)
 
     # 装饰：无版权几何光斑（纯算法）
-    _DECOR_SPOTS = [
-        (0.86, 0.16, 74, accent, 0.20),
-        (0.72, 0.92, 52, (90, 150, 255), 0.13),
-        (0.05, 0.88, 44, accent, 0.09),
-    ]
-    for sx, sy, sr, sc, sa in _DECOR_SPOTS:
-        c.disc(w * sx, h * sy, sr, sc, alpha=sa)
+    c.disc(w * 0.86, h * 0.16, 74, accent, alpha=0.20)
+    c.disc(w * 0.72, h * 0.92, 52, (90, 150, 255), alpha=0.13)
+    c.disc(w * 0.05, h * 0.88, 44, accent, alpha=0.09)
 
     # 顶部强调条
     c.rect(0, 0, w, 5, accent, alpha=0.95)
 
     # 代码流装饰线（右侧，程序化）
-    _CODE_LINES = 9
-    for i in range(_CODE_LINES):
+    for i in range(9):
         y = 52 + i * 33
         ln = int(52 + (i * 37) % 118)
         alpha = 0.10 + (i % 3) * 0.05
         c.rect(w - 210, y, w - 210 + ln, y + 3, (120, 175, 255), alpha=alpha)
 
     # 网格点阵（左下）
-    _GRID_ROWS, _GRID_COLS = 5, 7
-    for gy in range(_GRID_ROWS):
-        for gx in range(_GRID_COLS):
+    for gy in range(5):
+        for gx in range(7):
             c.rect(34 + gx * 15, h - 96 + gy * 15, 37 + gx * 15, h - 93 + gy * 15,
                    (110, 160, 240), alpha=0.16)
 
