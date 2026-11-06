@@ -22,25 +22,12 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
-import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
-from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 CST = timezone(timedelta(hours=8))
 HEX_BASE = "https://hex2077.dev/zh-CN/docs"
 AIHOT_FEED = "https://aihot.news/feed.xml"
-
-# strip_tags 用的预编译正则（避免每次调用都重编译）
-_RE_SVG = re.compile(r"<svg[\s\S]*?</svg>", re.I)
-_RE_SCRIPT = re.compile(r"<script[\s\S]*?</script>", re.I)
-_RE_STYLE = re.compile(r"<style[\s\S]*?</style>", re.I)
-_RE_IMG = re.compile(r"<img[^>]*>", re.I)
-_RE_BR = re.compile(r"<br\s*/?>", re.I)
-_RE_P_END = re.compile(r"</p>", re.I)
-_RE_ANY_TAG = re.compile(r"<[^>]+>")
-_RE_WS = re.compile(r"[ \t\u00a0]+")
-_RE_MULTI_NL = re.compile(r"\n\s*\n+")
 def _find_lite_script() -> Path:
     """定位 follow-builders-lite 的取数脚本。
 
@@ -56,6 +43,7 @@ def _find_lite_script() -> Path:
     return cands[0]
 
 
+LITE_SCRIPT = _find_lite_script()
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ai-daily-merged/1.0"
 
 
@@ -71,16 +59,16 @@ def http_get(url: str, timeout: int = 25) -> str:
 def strip_tags(s: str) -> str:
     if not s:
         return ""
-    s = _RE_SVG.sub(" ", s)
-    s = _RE_SCRIPT.sub(" ", s)
-    s = _RE_STYLE.sub(" ", s)
-    s = _RE_IMG.sub(" ", s)
-    s = _RE_BR.sub("\n", s)
-    s = _RE_P_END.sub("\n", s)
-    s = _RE_ANY_TAG.sub("", s)
+    s = re.sub(r"<svg[\s\S]*?</svg>", " ", s, flags=re.I)
+    s = re.sub(r"<script[\s\S]*?</script>", " ", s, flags=re.I)
+    s = re.sub(r"<style[\s\S]*?</style>", " ", s, flags=re.I)
+    s = re.sub(r"<img[^>]*>", " ", s, flags=re.I)
+    s = re.sub(r"<br\s*/?>", "\n", s, flags=re.I)
+    s = re.sub(r"</p>", "\n", s, flags=re.I)
+    s = re.sub(r"<[^>]+>", "", s)
     s = htmlmod.unescape(s)
-    s = _RE_WS.sub(" ", s)
-    s = _RE_MULTI_NL.sub("\n", s)
+    s = re.sub(r"[ \t\u00a0]+", " ", s)
+    s = re.sub(r"\n\s*\n+", "\n", s)
     return s.strip()
 
 
@@ -144,19 +132,25 @@ def fetch_hex2077(target: datetime, lookback_days: int, timeout: int) -> dict:
             html = http_get(url, timeout)
         except urllib.error.HTTPError as e:
             last_err = f"{url} -> HTTP {e.code}"
+            if e.code == 404:
+                continue
+            continue
         except Exception as e:  # noqa: BLE001
-            last_err = f"{url} -> {type(e).__name__}: {e}"
-        else:
-            data = parse_hex2077(html)
-            if data["sections"]:
-                data.update({"date": d.isoformat(), "url": url, "isFallback": i > 0, "daysBack": i})
-                return data
+            last_err = f"{url} -> {e}"
+            continue
+        data = parse_hex2077(html)
+        if not data["sections"]:
             last_err = f"{url} -> 页面无板块内容"
+            continue
+        data.update({"date": d.isoformat(), "url": url, "isFallback": i > 0, "daysBack": i})
+        return data
     return {"error": last_err or "no page found", "sections": []}
 
 
 # ---------------------------------------------------------------- source 2: AIHOT
 def parse_aihot(xml_text: str, cutoff: datetime) -> dict:
+    import xml.etree.ElementTree as ET
+
     root = ET.fromstring(xml_text)
     items = []
     for it in root.iter("item"):
@@ -167,6 +161,8 @@ def parse_aihot(xml_text: str, cutoff: datetime) -> dict:
         desc_html = g("description")
         pub_raw = g("pubDate")
         try:
+            from email.utils import parsedate_to_datetime
+
             pub = parsedate_to_datetime(pub_raw)
             if pub.tzinfo is None:
                 pub = pub.replace(tzinfo=timezone.utc)
@@ -219,12 +215,11 @@ def fetch_aihot(target: datetime, window_hours: int, timeout: int) -> dict:
 
 # ---------------------------------------------------------------- source 3: follow-builders-lite
 def run_follow_builders(max_chars: int, timeout: int) -> dict:
-    lite_script = _find_lite_script()
-    if not lite_script.exists():
-        return {"error": f"lite script not found: {lite_script}"}
+    if not LITE_SCRIPT.exists():
+        return {"error": f"lite script not found: {LITE_SCRIPT}"}
     try:
         p = subprocess.run(
-            [sys.executable, str(lite_script), "--language", "zh", "--max-field-chars", str(max_chars)],
+            [sys.executable, str(LITE_SCRIPT), "--language", "zh", "--max-field-chars", str(max_chars)],
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -254,9 +249,7 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--timeout", type=int, default=25)
     ap.add_argument("--max-chars", type=int, default=6000, help="follow-builders 长文本截断")
     ap.add_argument("--no-follow-builders", action="store_true", help="跳过 follow-builders 源")
-    ap.add_argument("--fb-timeout", type=int, default=150, help="follow-builders 子进程超时秒数（默认150）")
     ap.add_argument("--out", help="把 JSON 写入该文件（否则只写 stdout）")
-    ap.add_argument("-v", "--verbose", action="store_true", help="把内部错误也打印到 stderr")
     return ap.parse_args()
 
 
@@ -287,17 +280,13 @@ def main() -> int:
 
     fb_data: dict = {}
     if not args.no_follow_builders:
-        fb_data = run_follow_builders(args.max_chars, timeout=args.fb_timeout)
+        fb_data = run_follow_builders(args.max_chars, timeout=150)
         if fb_data.get("error"):
             errors.append(f"follow-builders: {fb_data['error']}")
 
     # sanitize internal fields
     for it in aihot_data.get("items", []):
         it.pop("_pub", None)
-
-    if args.verbose and errors:
-        for e in errors:
-            print(f"[warn] {e}", file=sys.stderr)
 
     result = {
         "status": "ok" if not errors else "partial",
@@ -334,4 +323,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
