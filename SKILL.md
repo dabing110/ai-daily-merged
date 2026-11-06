@@ -156,27 +156,61 @@ python scripts/prepare_merged_digest.py --out digest.json
 
 ## 无版权封面图生成（make_cover.py）
 
-每天产出日报的同时生成公众号封面（900×383，2.35:1），命令：`python scripts/make_cover.py --date YYYY-MM-DD --out "<封面路径>"`。参数见 `--help`。
+每天产出日报的同时生成公众号封面（900×383，2.35:1，远小于 2MB 限制）：
 
-**模板模式**：自备品牌底图（3000×1277，**不可含具体日期**），脚本自动等比裁剪到 900×383，左下角叠加每日日期条 + 注脚。若底图含 AI 生成角标**必须保留**。需要 PIL（JPG 解码），缺失时自动回落程序化模式。
+```bash
+python scripts/make_cover.py \
+  --date YYYY-MM-DD --out "<库目录>/AI日报/YYYY-MM-DD_封面.png"
+```
 
-**程序化模式（默认，零素材）**：纯几何绘制（渐变底 + 光斑 + 代码流装饰线 + 点阵），零第三方素材。
+参数：`--date`（默认今天）· `--title`（默认「AI日报」）· `--subtitle`（默认「三源融合 · AI Coding / 具身智能 / 智能体安全」）· `--accent`（默认 `#165DFF`）· `--template`（可选，模板底图模式）· `--out`（必填）。
 
-**解释器自举**：当前解释器缺 Pillow 时自动找带 PIL 的重跑，可用 `AI_DAILY_PYTHON` 指定。
+**模板模式**（推荐用于固定品牌视觉）：
 
-失败则跳过封面继续后续流程，不要中断出报。
+```bash
+python scripts/make_cover.py --date YYYY-MM-DD \
+    --template "<你的品牌底图>.jpg" \
+    --out "<库目录>/AI日报/YYYY-MM-DD_封面.png"
+```
+
+- 底图建议自备一张品牌模板（如 3000×1277），脚本自动等比缩放裁剪到 900×383，左下角叠加**每日日期条**（「9月30日 · 星期三」，accent 色圆角条）+ 注脚「三源融合 · 公开信息聚合」。
+- 模板必须**不含具体日期**（含日期的底图只能当天用），也不要用未经授权的第三方素材。
+- 若底图含 AI 生成角标，**必须保留**，不得裁剪或抹除——符合 AI 生成内容标识规定，发布平台合规。
+- 模板模式需要 PIL（JPG 解码）；PIL 不可用或模板缺失时自动回落程序化模式，不阻塞出报。
+
+**程序化模式（默认，零素材）**：纯几何绘制（渐变底 + 光斑 + 代码流装饰线 + 点阵），
+零第三方素材，**无版权风险**；文字用系统自带中文字体渲染（仅屏幕渲染，字体不随文件分发）。
+
+**解释器自举**：脚本若检测到当前解释器没有 Pillow，会自动找到带 PIL 的解释器重跑自己
+（可用环境变量 `AI_DAILY_PYTHON` 指定）。输出末尾的标注可判断渲染路径：
+
+- `(template + date chip)` → 模板模式（预期路径）
+- `(text via PIL)` → 程序化模式，中文正常渲染
+- `(text via builtin bitmap)` → 退化为 5x7 点阵，只有拉丁字符（无中文），可接受但需注明
+
+失败则跳过封面继续后续流程（`cover_img` 留空），不要中断出报。
 
 ## 建稿参数自动生成（build_article.py）
 
-发布到公众号前，把 Markdown 日报转成发布服务的「章节」结构：
-`python scripts/build_article.py --md "<日报MD>" --focus "焦点" --abstract "摘要" --cover "<封面直链>" --out article.json --pending 待建稿.json`
+发布到公众号前，需要把 Markdown 日报转成发布服务的「章节」结构。手写这份 JSON 既容易出错又耗时，
+`build_article.py` 把这一步固化：
 
-- 按固定版式解析 MD → chapters（要点 ordered / 主条目 / 速览 unordered / Builder / 播客 / 免责）。
-- `[text](url)` → `text url` 明文（公众号不渲染 MD），`**加粗**` 自动剥离。
-- **自动校验 title ≤ 30、abstract ≤ 100**，超限直接报错退出码 2，不静默截断。
-- `--pending` 写 `status=pending` 状态文件，防同日重复建稿。
-- **主条目标题层级**：必须用 `## 一、xxx` 中文序号二级标题（三层结构会导致解析错误，已做 A/B 双解析兼容）。
-- 建稿前看统计行 `chapters: N 块 | 要点 a / 主条目 b / 速览 c / Builder d / 播客 e / 免责 f`，不一致先改 MD。
+```bash
+python scripts/build_article.py \
+  --md "<库目录>/AI日报/YYYY-MM-DD.md" \
+  --focus "焦点短语" --abstract "摘要" --cover "<封面公网直链>" \
+  --out "article_YYYY-MM-DD.json" \
+  --pending "待建稿_YYYY-MM-DD.json"
+```
+
+- 按固定版式解析 MD → `chapters`（今日要点 ordered list / 主条目 / 今日速览 unordered list / Builder 观点按人分块 / 播客 / 免责声明）。
+- `[text](url)` 自动转成 `text url` 明文（公众号不渲染 markdown），`**加粗**` 自动剥离。
+- **自动校验 `title ≤ 30`、`abstract ≤ 100`**，超限直接报错退出（退出码 2）且**不写文件**，不会静默截断——此时缩短 `--focus` / `--abstract` 重跑即可。
+- `--focus` 缺省取第一条主条目标题的前 18 字；`--abstract` 缺省取前 3 条要点拼接。
+- `--pending` 写出待建稿状态文件（`status=pending`），建稿成功后应改写为 `done` 并记入返回的 id，**用于防同日重复建稿**（多数发布服务没有删除草稿的接口，重跑会让草稿箱多一份）。
+- 解析依赖固定版式：`## 今日要点` / 主条目 / `## 今日速览` / `## Builder 观点` / `## 播客` / `## 来源与免责声明`。改版式要同步改脚本。
+- **主条目的标题层级是关键（踩过坑）**：必须写成 `## 一、xxx` / `## 二、xxx`（中文序号二级标题），**不要**写成「`## 主条目` + `### 1. xxx`」三层结构——脚本只认前者的二级标题，三层结构会把第 2 条起的内容降级成段落文字塞进第一章（统计只显示「主条目 1」）。旧三层版式仍兼容（已做 A/B 双解析），但新写的日报请用二级标题。
+- **建稿前必看统计行**：脚本会打印 `chapters: N 块 | 要点 a / 主条目 b / 速览 c / Builder d / 播客 e / 免责 f`，其中 `b` 必须与 MD 里主条目条数一致（Builder 同理），不一致先改 MD 再重跑。
 
 ## 推送到微信公众号（可选，需自备发布服务）
 
