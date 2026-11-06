@@ -19,10 +19,6 @@ token 直接以 JSON-RPC 调远程工具，因此无头环境也能稳定跑通�
     python yanxu_mcp.py --accounts               # 快捷：列出已绑定公众号
     python yanxu_mcp.py --themes                 # 快捷：列出样式主题
 """
-
-from __future__ import annotations
-
-import argparse
 import json
 import os
 import sys
@@ -47,26 +43,26 @@ TOOLS_DIR = os.environ.get("YANXU_HOME") or os.path.join(os.path.expanduser("~")
 TOKEN_FILE = os.path.join(TOOLS_DIR, ".yanxu_token.json")
 
 
-def load_json(path) -> dict | None:
+def load_json(path):
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             return json.load(f)
     return None
 
 
-def save_json(path, obj) -> None:
+def save_json(path, obj):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
     try:
         os.chmod(path, 0o600)
-    except (AttributeError, OSError):
-        pass  # Windows 上 os.chmod 不存在或不可用，忽略
+    except Exception:
+        pass
 
 
 # ---------- token 管理 ----------
 
-def refresh_access_token(tok: dict | None = None) -> dict:
+def refresh_access_token(tok=None):
     tok = tok or load_json(TOKEN_FILE)
     if not tok or not tok.get("refresh_token"):
         raise RuntimeError("没有 refresh_token，请先运行 yanxu_auth.py --manual 完成授权")
@@ -116,12 +112,11 @@ def get_access_token(force=False):
 # ---------- MCP JSON-RPC ----------
 
 class McpClient:
-    def __init__(self, token=None, timeout: int = 60):
+    def __init__(self, token=None):
         self.token = token or get_access_token()
         self.session_id = None
         self._id = 0
         self.server_info = None
-        self.timeout = timeout
 
     def _post(self, payload, notify=False):
         data = json.dumps(payload).encode("utf-8")
@@ -135,7 +130,7 @@ class McpClient:
             headers["Mcp-Session-Id"] = self.session_id
         req = urllib.request.Request(MCP_URL, data=data, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+            with urllib.request.urlopen(req, timeout=60) as r:
                 sid = r.headers.get("Mcp-Session-Id") or r.headers.get("mcp-session-id")
                 if sid:
                     self.session_id = sid
@@ -207,7 +202,7 @@ class McpClient:
         )
 
 
-def unwrap(resp) -> dict | str | list | None:
+def unwrap(resp):
     """把 tools/call 返回里的 content 文本抽出来"""
     if not resp:
         return resp
@@ -228,21 +223,10 @@ def unwrap(resp) -> dict | str | list | None:
     return result
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    group = ap.add_mutually_exclusive_group()
-    group.add_argument("--status", action="store_true", help="查看 token 状态")
-    group.add_argument("--refresh", action="store_true", help="强制刷新 access token")
-    group.add_argument("--tools", action="store_true", help="列出服务端工具")
-    group.add_argument("--accounts", action="store_true", help="快捷：列出已绑定公众号")
-    group.add_argument("--themes", action="store_true", help="快捷：列出样式主题")
-    group.add_argument("--call", metavar="TOOL", help="调用指定工具，配合 --args")
-    ap.add_argument("--args", default="{}", help="传给 --call 的 JSON 参数（默认 {}）")
-    ap.add_argument("--timeout", type=int, default=60, help="单次 MCP 请求超时秒数（默认 60）")
-    args = ap.parse_args()
-
+def main():
+    argv = sys.argv[1:]
     try:
-        if args.status:
+        if "--status" in argv:
             tok = load_json(TOKEN_FILE)
             if not tok:
                 print("未授权：先运行 yanxu_auth.py --manual")
@@ -255,36 +239,45 @@ def main() -> int:
             print(f"refresh   : {'有' if tok.get('refresh_token') else '无'}")
             return 0
 
-        if args.refresh:
+        if "--refresh" in argv:
             refresh_access_token()
             return 0
 
-        cli = McpClient(timeout=args.timeout)
+        cli = McpClient()
         init = cli.initialize()
         print(f"[mcp] 已连接，server={cli.server_info}，session={cli.session_id}")
 
-        if args.tools:
+        if "--tools" in argv:
             res = cli.list_tools()
             tools = (res or {}).get("result", {}).get("tools", [])
             for t in tools:
                 print(f"  - {t.get('name')}: {(t.get('description') or '')[:80]}")
             return 0
 
-        if args.accounts:
+        if "--accounts" in argv:
             print(json.dumps(unwrap(cli.call_tool("list_wechat_accounts", {})), ensure_ascii=False, indent=2))
             return 0
 
-        if args.themes:
+        if "--themes" in argv:
             print(json.dumps(unwrap(cli.call_tool("list_theme_styles", {})), ensure_ascii=False, indent=2))
             return 0
 
-        if args.call:
-            call_args = json.loads(args.args)
-            resp = cli.call_tool(args.call, call_args)
+        if "--call" in argv:
+            i = argv.index("--call")
+            if i + 1 >= len(argv):
+                print("用法：--call <tool> [--args '{...}']")
+                return 1
+            tool = argv[i + 1]
+            args = {}
+            if "--args" in argv:
+                j = argv.index("--args")
+                if j + 1 < len(argv):
+                    args = json.loads(argv[j + 1])
+            resp = cli.call_tool(tool, args)
             print(json.dumps(unwrap(resp), ensure_ascii=False, indent=2))
             return 0
 
-        ap.print_help()
+        print("用法：--status | --refresh | --tools | --accounts | --themes | --call <tool> --args '{...}'")
         return 0
     except Exception as e:
         print(f"❌ {e}")
