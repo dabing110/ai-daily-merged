@@ -1,0 +1,29 @@
+# ---- 生成物（含抓取内容，勿入库）----
+digest.json
+AI日报_*.md
+AI日报_*.html
+*_封面.png
+*.cover.png
+
+# ---- 封面底图模板（个人品牌素材，自行保留）----
+封面模板.jpg
+
+# ---- 授权凭据（含 access/refresh token，绝不能入库）----
+.yanxu_*.json
+.yanxu_token.json
+.yanxu_client.json
+.yanxu_pkce.json
+article_*.json
+待建稿_*.json
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
