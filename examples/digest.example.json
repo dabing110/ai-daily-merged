@@ -1,0 +1,67 @@
+{
+  "_comment": "digest.json 结构示例（占位数据）。真实运行时由 scripts/prepare_merged_digest.py 生成。",
+  "status": "ok",
+  "generatedAt": "2026-09-30T08:00:12+08:00",
+  "targetDate": "2026-09-30",
+  "windowHours": 28,
+  "errors": null,
+  "sources": {
+    "hex2077": {
+      "title": "AI 资讯日报 · 2026-09-30",
+      "summary": "今日摘要文本……",
+      "date": "2026-09-29",
+      "url": "https://hex2077.dev/zh-CN/docs/2026-09/2026-09-29/",
+      "isFallback": true,
+      "daysBack": 1,
+      "sections": [
+        {
+          "name": "产品更新",
+          "items": [
+            {
+              "title": "示例条目标题",
+              "text": "示例条目正文……",
+              "links": [{ "text": "原文", "url": "https://example.com/post" }]
+            }
+          ]
+        }
+      ]
+    },
+    "aihot": {
+      "count": 2,
+      "isFallback": false,
+      "categories": { "AI 模型": 1, "行业动态": 1 },
+      "feedUrl": "https://aihot.news/feed.xml",
+      "items": [
+        {
+          "title": "示例条目",
+          "url": "https://aihot.news/items/example",
+          "category": "AI 模型",
+          "source": "来源媒体",
+          "publishedAt": "2026-09-30T07:12:00+08:00",
+          "summary": "示例摘要……",
+          "links": []
+        }
+      ]
+    },
+    "followBuilders": {
+      "stats": { "xBuilders": 18, "totalTweets": 34, "podcastEpisodes": 0, "blogPosts": 0 },
+      "upstream": "follow-builders-lite",
+      "x": [
+        {
+          "builder": "示例 Builder",
+          "bio": "示例头衔",
+          "tweets": [{ "text": "示例推文内容……", "url": "https://x.com/example/status/1" }]
+        }
+      ],
+      "podcasts": [],
+      "blogs": [],
+      "error": null
+    }
+  },
+  "instructions": [
+    "仅使用本 JSON 中的内容，不得编造事实或访问外部链接。",
+    "三源交叉去重：同一事件出现在多个来源时合并为一条，标注多来源。",
+    "侧重 AI Coding / 具身智能 / 端侧 AI，但不要遗漏重大行业事件。",
+    "每条保留原始链接；不确定的信息明确标注。"
+  ]
+}
