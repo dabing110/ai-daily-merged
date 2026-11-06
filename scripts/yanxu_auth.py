@@ -22,10 +22,6 @@ token 存本地文件，之后由 yanxu_mcp.py 自行刷新并直连，全程不
     .yanxu_pkce.json     # 待完成的 PKCE（verifier/state）
     .yanxu_token.json    # access/refresh token（敏感，勿外传，已在 .gitignore 中排除）
 """
-
-from __future__ import annotations
-
-import argparse
 import base64
 import hashlib
 import http.server
@@ -67,21 +63,11 @@ def http_post_json(url, payload):
     req = urllib.request.Request(
         url, data=data, headers={"Content-Type": "application/json"}, method="POST"
     )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            return json.loads(r.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        try:
-            body = e.read().decode("utf-8", "replace")
-        except Exception:
-            body = ""
-        try:
-            raise RuntimeError(f"HTTP {e.code}: {json.loads(body)}") from e
-        except Exception:
-            raise RuntimeError(f"HTTP {e.code}: {body[:400]}") from e
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode("utf-8"))
 
 
-def http_post_form(url, payload) -> dict:
+def http_post_form(url, payload):
     data = urllib.parse.urlencode(payload).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -91,33 +77,30 @@ def http_post_form(url, payload) -> dict:
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            return json.loads(r.read().decode("utf-8"))
+            return r.status, json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "replace")
         try:
-            body = e.read().decode("utf-8", "replace")
+            return e.code, json.loads(body)
         except Exception:
-            body = ""
-        try:
-            raise RuntimeError(f"HTTP {e.code}: {json.loads(body)}") from e
-        except Exception:
-            raise RuntimeError(f"HTTP {e.code}: {body[:400]}") from e
+            return e.code, {"raw": body}
 
 
-def load_json(path) -> dict | None:
+def load_json(path):
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             return json.load(f)
     return None
 
 
-def save_json(path, obj) -> None:
+def save_json(path, obj):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
     try:
         os.chmod(path, 0o600)
-    except (AttributeError, OSError):
-        pass  # Windows 上 os.chmod 不存在或不可用，忽略
+    except Exception:
+        pass
 
 
 # ---------- 客户端注册 / PKCE ----------
@@ -145,7 +128,7 @@ def get_or_register_client():
     return info
 
 
-def pkce_pair() -> tuple[str, str]:
+def pkce_pair():
     verifier = secrets.token_urlsafe(64)[:64]
     challenge = base64.urlsafe_b64encode(
         hashlib.sha256(verifier.encode("ascii")).digest()
@@ -286,22 +269,18 @@ def cmd_exchange(raw):
     if not code:
         print("❌ 未能从输入中解析出 code。")
         return 1
-    try:
-        tok = http_post_form(
-            TOKEN_URL,
-            {
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": REDIRECT_URI,
-                "client_id": pkce["client_id"],
-                "code_verifier": pkce["verifier"],
-            },
-        )
-    except RuntimeError as e:
-        print(f"❌ 换取 token 失败: {e}")
-        return 1
-    if "access_token" not in tok:
-        print(f"❌ 换取 token 失败（响应无 access_token）: {tok}")
+    status, tok = http_post_form(
+        TOKEN_URL,
+        {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": REDIRECT_URI,
+            "client_id": pkce["client_id"],
+            "code_verifier": pkce["verifier"],
+        },
+    )
+    if status != 200 or "access_token" not in tok:
+        print(f"❌ 换取 token 失败 HTTP {status}: {tok}")
         return 1
     save_token(pkce["client_id"], tok)
     try:
@@ -335,22 +314,18 @@ def cmd_wait():
         print(f"❌ 回调未带 code：{result}")
         return 1
     print(f"[auth] 收到授权码（{code[:8]}…）")
-    try:
-        tok = http_post_form(
-            TOKEN_URL,
-            {
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": REDIRECT_URI,
-                "client_id": client["client_id"],
-                "code_verifier": verifier,
-            },
-        )
-    except RuntimeError as e:
-        print(f"❌ 换取 token 失败: {e}")
-        return 1
-    if "access_token" not in tok:
-        print(f"❌ 换取 token 失败（响应无 access_token）: {tok}")
+    status, tok = http_post_form(
+        TOKEN_URL,
+        {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": REDIRECT_URI,
+            "client_id": client["client_id"],
+            "code_verifier": verifier,
+        },
+    )
+    if status != 200 or "access_token" not in tok:
+        print(f"❌ 换取 token 失败 HTTP {status}: {tok}")
         return 1
     save_token(client["client_id"], tok)
     expires_in = int(tok.get("expires_in") or 3600)
@@ -358,20 +333,18 @@ def cmd_wait():
     return 0
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    group = ap.add_mutually_exclusive_group()
-    group.add_argument("--status", action="store_true", help="查看 client / token 状态")
-    group.add_argument("--manual", action="store_true", help="只打印授权链接并保存 PKCE，不等待")
-    group.add_argument("--exchange", metavar="CODE_OR_URL", help="用 --manual 保存的 PKCE 换取 token")
-    args = ap.parse_args()
-
-    if args.status:
+def main():
+    argv = sys.argv[1:]
+    if "--status" in argv:
         return cmd_status()
-    if args.manual:
+    if "--manual" in argv:
         return cmd_manual()
-    if args.exchange is not None:
-        return cmd_exchange(args.exchange)
+    if "--exchange" in argv:
+        i = argv.index("--exchange")
+        if i + 1 >= len(argv):
+            print("用法：--exchange \"<回调URL或裸code>\"")
+            return 1
+        return cmd_exchange(argv[i + 1])
     return cmd_wait()
 
 
