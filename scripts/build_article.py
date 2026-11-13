@@ -225,8 +225,9 @@ def main():
     builders = parse_builders(body)
     podcast = parse_prose(body, "播客")
     disclaimer = parse_prose(body, "来源与免责声明")
-    # 可选：公众号脱敏版会把原始链接统一收拢到文末「原文链接」章节
-    ref_links = parse_bullets(body, "原文链接")
+    # 公众号脱敏版把原始链接统一收拢到文末 References 章节（2026-11-13 起为
+    # 阮一峰周刊式「正文 [n] 上标 + 文末 References」）；兼容旧「原文链接」标题
+    ref_links = parse_bullets(body, "References") or parse_bullets(body, "原文链接")
 
     if not key_points or not main_ch:
         print("ERROR: 解析失败——未找到「今日要点」或「主条目」，请检查 MD 版式")
@@ -274,7 +275,7 @@ def main():
         chapters.append({"title": "来源与免责声明", "type": "chapter",
                          "blocks": [{"type": "paragraph", "content": p} for p in disclaimer]})
     if ref_links:
-        chapters.append({"title": "原文链接", "type": "chapter",
+        chapters.append({"title": "References", "type": "chapter",
                          "blocks": [{"type": "list", "style": "unordered", "items": ref_links}]})
 
     payload = {"title": title, "abstract": abstract, "intro": intro,
@@ -295,7 +296,7 @@ def main():
     print("OK", out)
     print("title    (%d) %s" % (len(title), title))
     print("abstract (%d) %s" % (len(abstract), abstract))
-    print("chapters: %d 块 | 要点 %d / 主条目 %d / 速览 %d / Builder %d / 播客 %d / 免责 %d / 原文链接 %d"
+    print("chapters: %d 块 | 要点 %d / 主条目 %d / 速览 %d / Builder %d / 播客 %d / 免责 %d / References %d"
           % (len(chapters), len(key_points), len(main_ch), len(quick),
              len(builders), len(podcast), len(disclaimer), len(ref_links)))
     return 0
