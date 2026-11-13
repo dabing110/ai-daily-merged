@@ -124,6 +124,16 @@ python scripts/prepare_merged_digest.py --out digest.json
 
 ## 微信公众号版输出（可选）
 
+> **🔴 2026-11-13 起链接格式（阮一峰周刊式，现行标准）**：公众号版由
+> `scripts/wechat_sanitize.py` 生成（脱敏 + 链接转换）。转换规则：正文
+> `[text](url)` → `text[n]`（上标序号），全部 URL 按出现顺序全局去重编号，
+> 收拢到文末 `## References` 章节（`- [1] 标签: URL`）；标签优先取链接文字
+> 在中文标点（：，、）处的语义边界截断，避免英文单词切半。
+> `build_article.py` 把 References 解析成最后一个 chapter（统计行显示
+> 「References N」，兼容旧「原文链接」标题）。Obsidian 版保留 markdown
+> 可点击链接不动。建稿校验口径：`inline_urls=0`、`ref_links>0`、
+> chapters 统计行含「References N」。
+
 需要转成公众号格式时，除 Markdown 日报外再产出一份可直接粘贴的 HTML：
 `<工作区>/AI日报_<YYYY-MM-DD>_公众号版.html`
 
