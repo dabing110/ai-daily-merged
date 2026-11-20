@@ -305,6 +305,16 @@ curl -s --max-time 25 "https://hex2077.dev/zh-CN/docs/" | \
 - 目录页最新日期 < 目标日期 → **上游停更**，回溯无解。按降级策略出报，并在正文开头与「来源说明与免责」里
   如实标注该源缺位，不要假装正常。
 
+### follow-builders 返回 0 条
+
+lite 脚本（`follow-builders-lite`）已内置三级通道兜底：官方 raw → gh.idayer.com 镜像 → **GitHub Contents API**。判定与处置：
+
+- 官方 `raw.githubusercontent.com` 在部分沙箱代理下连接重置（`WinError 10054`），属常态，无需处理。
+- 镜像 `gh.idayer.com` 若返回 Cloudflare **error 1027 / HTTP 429**，是防火墙规则拦截当前出口 IP，**重试与等待均无效**（2026-11-20/21 连续证实）。
+- 兜底 `https://api.github.com/repos/zarazhangrui/follow-builders/contents` 通常在沙箱白名单内，用 `Accept: application/vnd.github.raw+json` 取文件原文；未认证配额 60 次/小时，每期仅用 3 次。
+- 上游健康度探测：`curl -s "https://api.github.com/repos/zarazhangrui/follow-builders/commits?per_page=3"`，每天约 06:30Z 有一条 `chore: update feeds`。当日 06:30Z 之前取到的是上一期，属正常。
+- 仅当三级通道全挂时才按旧规则探活 + 带 `FOLLOW_BUILDERS_RAW_BASE` 重跑一次；仍 0 就省略 Builder/播客板块并在汇报注明，不阻塞出报。
+
 ### AIHOT 条目太少
 
 默认 `--window-hours 28` 有时只捞到几条。内容偏少时放宽到 48 小时补抓（只取 aihot 部分，与首轮合并去重）：
