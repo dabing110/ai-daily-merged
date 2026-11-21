@@ -18,7 +18,7 @@ description: AI 日报三源融合。把「何夕2077 AI资讯日报」「AIHOT 
 ## 依赖
 
 - Python 3.9+，**仅标准库**（抓取与封面生成都不需要 pip 安装任何包；封面渲染中文时会尝试调用带 Pillow 的解释器，缺失则自动退化）
-- 第三源需要 `follow-builders-lite` 技能（其 `scripts/prepare_digest.py`）。缺失时用 `--no-follow-builders` 跳过，或用环境变量 `AI_DAILY_LITE_SCRIPT` 指定路径
+- 第三源取数脚本内置于 `scripts/prepare_follow_builders.py`（三级通道兜底），克隆即用；如需替换可用环境变量 `AI_DAILY_LITE_SCRIPT` 指定路径。缺失时用 `--no-follow-builders` 跳过
 
 ## 快速开始
 
