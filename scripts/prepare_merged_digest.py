@@ -31,10 +31,13 @@ AIHOT_FEED = "https://aihot.news/feed.xml"
 def _find_lite_script() -> Path:
     """定位 follow-builders-lite 的取数脚本。
 
-    优先级：环境变量 AI_DAILY_LITE_SCRIPT > WorkBuddy 用户技能目录 > 本仓库同级 skills/。
+    优先级：环境变量 AI_DAILY_LITE_SCRIPT > 本仓库内置 scripts/prepare_follow_builders.py
+    > WorkBuddy 用户技能目录 > 本仓库同级 skills/。内置的三级兜底取数脚本随仓库分发，
+    克隆即可用，不依赖本机是否安装 follow-builders-lite 技能。
     """
     env = os.environ.get("AI_DAILY_LITE_SCRIPT", "").strip()
     cands = [Path(env)] if env else []
+    cands.append(Path(__file__).resolve().parent / "prepare_follow_builders.py")
     cands.append(Path.home() / ".workbuddy" / "skills" / "follow-builders-lite" / "scripts" / "prepare_digest.py")
     cands.append(Path(__file__).resolve().parent.parent / "skills" / "follow-builders-lite" / "scripts" / "prepare_digest.py")
     for c in cands:
