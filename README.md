@@ -55,8 +55,7 @@ python scripts/build_article.py --md "库目录/AI日报/YYYY-MM-DD.md" \
 | `--no-follow-builders` | 跳过第三源（离线 / 快速模式） |
 | `--out PATH` | 写出 JSON 文件；不传则打印到 stdout |
 
-第三源依赖 [`follow-builders-lite`](https://github.com/zarazhangrui/follow-builders) 的取数脚本，
-可通过环境变量 `AI_DAILY_LITE_SCRIPT` 指定路径；未安装时用 `--no-follow-builders` 即可照常出报。
+第三源取数脚本已**内置**于 `scripts/prepare_follow_builders.py`（三级通道兜底：官方 raw → gh.idayer.com 镜像 → GitHub Contents API），克隆即用，无需另装技能。查找优先级为：环境变量 `AI_DAILY_LITE_SCRIPT` > 仓库内置脚本 > 本机 `follow-builders-lite` 技能。想完全跳过第三源时用 `--no-follow-builders` 即可照常出报。
 
 ## 输出
 
